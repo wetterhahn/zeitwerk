@@ -1,6 +1,8 @@
 # Zeitwerk
 
-Selbst gehostete Wochenzeiterfassung mit Benutzerverwaltung und optionalem Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
+Aktuelle Version: **v1.1.0**
+
+Selbst gehostete Wochenzeiterfassung mit getrennter Mitarbeiter- und Benutzerverwaltung sowie optionalem Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
 
 Im Repository sind keine Mitarbeiter, Namen, Adressen, Personalnummern, Auftragsnummern oder Zeitdaten enthalten. Diese Daten entstehen ausschließlich in der laufenden Instanz.
 
@@ -22,11 +24,12 @@ Falls Port 8080 bereits belegt ist, kann in `docker-compose.yml` beispielsweise 
 
 ## Ohne Excel verwenden
 
-1. Unter **Benutzer** alle benötigten Benutzerkonten anlegen. Jedes Konto hat Vollzugriff.
-2. Unter **Kalenderwochen** Jahr und Kalenderwoche auswählen.
-3. Die Woche anlegen. Alle aktiven Benutzer werden automatisch übernommen.
-4. Unter **Aufträge** die wöchentlich benötigten Aufträge mit verpflichtender Auftragsnummer erfassen.
-5. Arbeitszeiten anschließend direkt unter **Erfassung** eintragen.
+1. Unter **Mitarbeiter & Konten** alle Personen für die Zeiterfassung anlegen. Dafür ist weder ein Benutzername noch ein Passwort nötig.
+2. Nur für Personen, die sich anmelden sollen, zusätzlich ein Benutzerkonto anlegen. Jedes Konto hat Vollzugriff.
+3. Unter **Kalenderwochen** Jahr und Kalenderwoche auswählen.
+4. Die Woche anlegen. Alle aktiven Mitarbeiter werden automatisch übernommen.
+5. Unter **Aufträge** die wöchentlich benötigten Aufträge mit verpflichtender Auftragsnummer erfassen.
+6. Arbeitszeiten anschließend direkt unter **Erfassung** eintragen.
 
 ## Excel-Datei optional importieren
 
@@ -54,9 +57,9 @@ Für eine Sicherung muss das Volume `zeitwerk_data` regelmäßig gesichert werde
 
 In Portainer den Stack öffnen, **Pull latest image** beziehungsweise **Re-pull image** aktivieren und den Stack erneut bereitstellen. Das Daten-Volume bleibt dabei erhalten.
 
-## Benutzer und Sicherheit
+## Mitarbeiter, Benutzer und Sicherheit
 
-Zeitwerk besitzt eine eigene Anmeldung. Passwörter werden mit `scrypt` und einem individuellen Salt gehasht gespeichert; alle aktiven Konten haben bewusst dieselbe Berechtigungsstufe **Vollzugriff**. Sitzungen laufen nach zwölf Stunden ab und werden beim Neustart des Containers beendet. Für den Einsatz außerhalb des internen Netzes wird zusätzlich HTTPS über einen Reverse Proxy empfohlen. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
+Mitarbeiter sind reine Stammdaten für die Zeiterfassung und benötigen kein Konto. Zeitwerk besitzt für die wenigen Personen mit Zugang eine eigene Anmeldung. Passwörter werden mit `scrypt` und einem individuellen Salt gehasht gespeichert; alle aktiven Konten haben bewusst dieselbe Berechtigungsstufe **Vollzugriff**. Sitzungen laufen nach zwölf Stunden ab und werden beim Neustart des Containers beendet. Für den Einsatz außerhalb des internen Netzes wird zusätzlich HTTPS über einen Reverse Proxy empfohlen. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
 
 ## Lokale Entwicklung
 
@@ -68,3 +71,4 @@ pnpm start
 ```
 
 Danach ist die Anwendung unter `http://localhost:3000` erreichbar.
+
