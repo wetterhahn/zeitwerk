@@ -3,12 +3,14 @@ import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import packageMetadata from './package.json' with { type: 'json' };
 import { importWorkbook } from './src/import-workbook.js';
-import { clearSession, createSession, passwordMatches, passwordRecord, publicUser, sessionUserId, validateCredentials } from './src/auth.js';
+import { clearSession, createSession, passwordMatches, passwordRecord, publicUser, sessionUserId, validateCredentials, validateEmployee } from './src/auth.js';
 import { readStore, writeStore } from './src/storage.js';
 import { createManualWeek } from './src/week.js';
 
 const app = express();
+const appVersion = packageMetadata.version;
 const port = Number(process.env.PORT || 3000);
 const uploadLimit = Math.max(1, Number(process.env.MAX_UPLOAD_MB || 25)) * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: uploadLimit, files: 1 } });
@@ -31,9 +33,10 @@ const credentialsFrom = (body, requirePassword = true) => {
   try { return validateCredentials(body, requirePassword); }
   catch (error) { error.status = 400; throw error; }
 };
-const duplicateUser = (users, credentials, excludedId) => users.find((user) => user.id !== excludedId && (user.username === credentials.username || String(user.personnelNumber) === credentials.personnelNumber));
+const duplicateUser = (users, credentials, excludedId) => users.find((user) => user.id !== excludedId && user.username === credentials.username);
+const employeeFrom = (store, employeeId) => store.employees.find((employee) => employee.id === employeeId);
 
-app.get('/api/health', (request, response) => response.json({ status: 'ok' }));
+app.get('/api/health', (request, response) => response.json({ status: 'ok', version: appVersion }));
 app.get('/api/session', async (request, response, next) => {
   try {
     const store = await readStore();
@@ -55,7 +58,9 @@ app.post('/api/setup', async (request, response, next) => {
     if (store.users.length) return response.status(409).json({ error: 'Die Ersteinrichtung wurde bereits abgeschlossen.' });
     const credentials = credentialsFrom(request.body);
     const password = await passwordRecord(credentials.password);
-    const user = { id: crypto.randomUUID(), username: credentials.username, name: credentials.name, personnelNumber: credentials.personnelNumber, active: true, createdAt: new Date().toISOString(), ...password };
+    const employee = { id: crypto.randomUUID(), name: credentials.name, personnelNumber: credentials.personnelNumber, active: true, createdAt: new Date().toISOString() };
+    const user = { id: crypto.randomUUID(), employeeId: employee.id, username: credentials.username, name: employee.name, personnelNumber: employee.personnelNumber, active: true, createdAt: new Date().toISOString(), ...password };
+    store.employees.push(employee);
     store.users.push(user);
     await writeStore(store);
     createSession(response, user.id, secureRequest(request));
@@ -97,13 +102,49 @@ app.get('/api/users', async (request, response, next) => {
   } catch (error) { next(error); }
 });
 
+app.get('/api/employees', async (request, response, next) => {
+  try {
+    const store = await readStore();
+    response.json({ employees: store.employees });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/employees', async (request, response, next) => {
+  try {
+    const store = await readStore();
+    const details = validateEmployee(request.body);
+    if (store.employees.some((employee) => String(employee.personnelNumber) === details.personnelNumber)) return response.status(409).json({ error: 'Diese Personalnummer ist bereits vergeben.' });
+    const employee = { id: crypto.randomUUID(), ...details, active: true, createdAt: new Date().toISOString() };
+    store.employees.push(employee);
+    await writeStore(store);
+    response.status(201).json({ employee });
+  } catch (error) { error.status ||= 400; next(error); }
+});
+
+app.put('/api/employees/:employeeId', async (request, response, next) => {
+  try {
+    const store = await readStore();
+    const employee = employeeFrom(store, request.params.employeeId);
+    if (!employee) return response.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
+    const details = validateEmployee(request.body);
+    if (store.employees.some((item) => item.id !== employee.id && String(item.personnelNumber) === details.personnelNumber)) return response.status(409).json({ error: 'Diese Personalnummer ist bereits vergeben.' });
+    Object.assign(employee, details, { active: request.body.active !== false });
+    store.users.filter((user) => user.employeeId === employee.id).forEach((user) => Object.assign(user, { name: employee.name, personnelNumber: employee.personnelNumber }));
+    await writeStore(store);
+    response.json({ employee });
+  } catch (error) { error.status ||= 400; next(error); }
+});
+
 app.post('/api/users', async (request, response, next) => {
   try {
     const store = await readStore();
-    const credentials = credentialsFrom(request.body);
-    if (duplicateUser(store.users, credentials)) return response.status(409).json({ error: 'Benutzername oder Personalnummer ist bereits vergeben.' });
+    const employee = employeeFrom(store, String(request.body.employeeId || ''));
+    if (!employee) return response.status(400).json({ error: 'Bitte einen vorhandenen Mitarbeiter auswählen.' });
+    const credentials = credentialsFrom({ ...request.body, name: employee.name, personnelNumber: employee.personnelNumber });
+    if (duplicateUser(store.users, credentials)) return response.status(409).json({ error: 'Dieser Benutzername ist bereits vergeben.' });
+    if (store.users.some((user) => user.employeeId === employee.id)) return response.status(409).json({ error: 'Für diesen Mitarbeiter existiert bereits ein Benutzerkonto.' });
     const password = await passwordRecord(credentials.password);
-    const user = { id: crypto.randomUUID(), username: credentials.username, name: credentials.name, personnelNumber: credentials.personnelNumber, active: true, createdAt: new Date().toISOString(), ...password };
+    const user = { id: crypto.randomUUID(), employeeId: employee.id, username: credentials.username, name: employee.name, personnelNumber: employee.personnelNumber, active: true, createdAt: new Date().toISOString(), ...password };
     store.users.push(user);
     await writeStore(store);
     response.status(201).json({ user: publicUser(user) });
@@ -115,11 +156,14 @@ app.put('/api/users/:userId', async (request, response, next) => {
     const store = await readStore();
     const user = store.users.find((candidate) => candidate.id === request.params.userId);
     if (!user) return response.status(404).json({ error: 'Benutzer nicht gefunden.' });
-    const credentials = credentialsFrom(request.body, false);
-    if (duplicateUser(store.users, credentials, user.id)) return response.status(409).json({ error: 'Benutzername oder Personalnummer ist bereits vergeben.' });
+    const employee = employeeFrom(store, String(request.body.employeeId || user.employeeId || ''));
+    if (!employee) return response.status(400).json({ error: 'Bitte einen vorhandenen Mitarbeiter auswählen.' });
+    const credentials = credentialsFrom({ ...request.body, name: employee.name, personnelNumber: employee.personnelNumber }, false);
+    if (duplicateUser(store.users, credentials, user.id)) return response.status(409).json({ error: 'Dieser Benutzername ist bereits vergeben.' });
+    if (store.users.some((item) => item.id !== user.id && item.employeeId === employee.id)) return response.status(409).json({ error: 'Für diesen Mitarbeiter existiert bereits ein Benutzerkonto.' });
     const active = request.body.active !== false;
     if (user.id === request.currentUser.id && !active) return response.status(400).json({ error: 'Das eigene Konto kann nicht deaktiviert werden.' });
-    Object.assign(user, { username: credentials.username, name: credentials.name, personnelNumber: credentials.personnelNumber, active });
+    Object.assign(user, { employeeId: employee.id, username: credentials.username, name: employee.name, personnelNumber: employee.personnelNumber, active });
     if (credentials.password) Object.assign(user, await passwordRecord(credentials.password));
     await writeStore(store);
     response.json({ user: publicUser(user) });
@@ -139,10 +183,10 @@ app.post('/api/weeks', async (request, response, next) => {
   try {
     const store = await readStore();
     let week;
-    try { week = createManualWeek({ year: request.body.year, weekNumber: request.body.weekNumber, users: store.users }); }
+    try { week = createManualWeek({ year: request.body.year, weekNumber: request.body.weekNumber, employees: store.employees }); }
     catch (error) { return response.status(400).json({ error: error.message }); }
     if (store.weeks[week.id]) return response.status(409).json({ error: `KW ${week.weekNumber}/${week.year} ist bereits vorhanden.` });
-    if (!week.employees.length) return response.status(400).json({ error: 'Mindestens ein aktiver Benutzer wird benötigt.' });
+    if (!week.employees.length) return response.status(400).json({ error: 'Mindestens ein aktiver Mitarbeiter wird benötigt.' });
     store.weeks[week.id] = week;
     await writeStore(store);
     response.status(201).json({ week, message: `KW ${week.weekNumber}/${week.year} wurde angelegt.` });
@@ -165,6 +209,12 @@ app.post('/api/import', upload.single('file'), async (request, response, next) =
     const week = await importWorkbook(request.file.buffer, path.basename(request.file.originalname));
     const store = await readStore();
     store.weeks[week.id] = { ...week, source: 'excel' };
+    for (const imported of week.employees) {
+      const personnelNumber = String(imported.id);
+      const existing = store.employees.find((employee) => String(employee.personnelNumber) === personnelNumber);
+      if (existing) existing.name = imported.name;
+      else store.employees.push({ id: crypto.randomUUID(), name: imported.name, personnelNumber, active: true, createdAt: new Date().toISOString() });
+    }
     await writeStore(store);
     response.status(201).json({ week: store.weeks[week.id], message: `KW ${week.weekNumber} wurde erfolgreich importiert.` });
   } catch (error) { next(error); }
@@ -213,3 +263,4 @@ app.use((error, request, response, next) => {
 });
 
 app.listen(port, '0.0.0.0', () => console.log(`Zeitwerk läuft auf Port ${port}`));
+
