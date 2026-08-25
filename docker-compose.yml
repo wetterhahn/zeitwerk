@@ -1,0 +1,18 @@
+services:
+  zeitwerk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zeitwerk
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      MAX_UPLOAD_MB: "25"
+    volumes:
+      - zeitwerk_data:/app/data
+
+volumes:
+  zeitwerk_data:
