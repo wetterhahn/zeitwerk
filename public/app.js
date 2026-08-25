@@ -1,4 +1,4 @@
-const state = { weeks: [], week: null, users: [], user: null, view: 'entry', selectedEmployeeId: null, dirty: false, loading: true };
+const state = { weeks: [], week: null, users: [], employees: [], user: null, version: '', view: 'entry', selectedEmployeeId: null, dirty: false, loading: true };
 const content = document.querySelector('#content');
 const bootFallback = document.querySelector('#boot-fallback');
 const authShell = document.querySelector('#auth-shell');
@@ -16,6 +16,7 @@ const hoursBetween = (start, end, pause = 0) => { if (!start || !end) return 0; 
 const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 const initials = (name) => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 const currentIsoWeek = () => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7)); const firstThursday = new Date(date.getFullYear(), 0, 4); return { year: date.getFullYear(), weekNumber: 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getDay() + 6) % 7)) / 7) }; };
+const greeting = () => { const hour = new Date().getHours(); return hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend'; };
 
 async function api(url, options = {}) {
   const method = String(options.method || 'GET').toUpperCase();
@@ -52,8 +53,9 @@ function showAuth(setupRequired) {
 }
 
 async function loadUsers() {
-  const result = await api('/api/users');
-  state.users = result.users;
+  const [usersResult, employeesResult] = await Promise.all([api('/api/users'), api('/api/employees')]);
+  state.users = usersResult.users;
+  state.employees = employeesResult.employees;
 }
 
 async function enterApp(user) {
@@ -63,6 +65,7 @@ async function enterApp(user) {
   appShell.hidden = false;
   document.querySelector('#account-name').textContent = user.name;
   document.querySelector('#account-avatar').textContent = initials(user.name) || 'U';
+  document.querySelector('#app-version').textContent = `v${state.version}`;
   await loadUsers();
   await loadWeeks();
 }
@@ -82,7 +85,7 @@ async function loadWeeks(preferredId) {
 }
 
 function renderHeader() {
-  const titles = { entry: ['Zeiterfassung', 'Wochenstunden erfassen'], overview: ['Auswertung', 'Wochenübersicht'], orders: ['Wochenplanung', 'Aufträge verwalten'], weeks: ['Planung', 'Kalenderwochen'], users: ['Verwaltung', 'Benutzer & Zugänge'], import: ['Optionale Datenübernahme', 'Excel-Datei importieren'] };
+  const titles = { entry: ['Zeiterfassung', `${greeting()}, ${state.user?.name || ''}!`], overview: ['Auswertung', 'Wochenübersicht'], orders: ['Wochenplanung', 'Aufträge verwalten'], weeks: ['Planung', 'Kalenderwochen'], users: ['Verwaltung', 'Mitarbeiter & Benutzerkonten'], import: ['Optionale Datenübernahme', 'Excel-Datei importieren'] };
   [sectionLabel.textContent, pageTitle.textContent] = titles[state.view];
   document.querySelectorAll('[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === state.view));
   weekSelect.innerHTML = state.weeks.length ? state.weeks.map((week) => `<option value="${escapeHtml(week.id)}" ${state.week?.id === week.id ? 'selected' : ''}>KW ${week.weekNumber} · ${escapeHtml(week.startDate)} bis ${escapeHtml(week.endDate)}</option>`).join('') : '<option>Noch keine Woche</option>';
@@ -129,6 +132,14 @@ function renderUsers() {
   return `<section class="page"><div class="management-layout"><div class="management-create card"><p class="eyebrow">Neuer Zugang</p><h2>Benutzer anlegen</h2><p>Jeder aktive Benutzer hat vollständigen Zugriff auf Erfassung, Wochen, Aufträge, Import und Benutzerverwaltung.</p><form id="user-form" class="stack-form"><label><span>Name</span><input name="name" required></label><label><span>Personalnummer</span><input name="personnelNumber" required></label><label><span>Benutzername</span><input name="username" minlength="3" required></label><label><span>Startpasswort</span><input name="password" type="password" minlength="8" required></label><button class="button primary" type="submit">Benutzer anlegen</button></form></div><div class="management-list"><p class="eyebrow">Vollzugriff für alle</p><h2>${state.users.length} Benutzer</h2><div class="user-list">${users}</div></div></div></section>`;
 }
 
+function renderPeople() {
+  const availableEmployees = state.employees.filter((employee) => !state.users.some((user) => user.employeeId === employee.id));
+  const employeeCards = state.employees.map((employee) => `<article class="user-card card ${employee.active ? '' : 'inactive'}"><div class="user-head"><span class="avatar">${escapeHtml(initials(employee.name))}</span><div><h3>${escapeHtml(employee.name)}</h3><p>Personal-Nr. ${escapeHtml(employee.personnelNumber)}</p></div><span class="role-tag">${state.users.some((user) => user.employeeId === employee.id) ? 'Mit Konto' : 'Ohne Konto'}</span></div><form class="employee-edit user-edit" data-employee-id="${escapeHtml(employee.id)}"><label><span>Name</span><input name="name" value="${escapeHtml(employee.name)}" required></label><label><span>Personal-Nr.</span><input name="personnelNumber" value="${escapeHtml(employee.personnelNumber)}" required></label><label class="switch"><input name="active" type="checkbox" ${employee.active ? 'checked' : ''}><span>Aktiv</span></label><button class="button secondary" type="submit">Speichern</button></form></article>`).join('');
+  const userCards = state.users.map((user) => `<article class="user-card card ${user.active ? '' : 'inactive'}"><div class="user-head"><span class="avatar">${escapeHtml(initials(user.name))}</span><div><h3>${escapeHtml(user.name)}</h3><p>@${escapeHtml(user.username)}</p></div><span class="role-tag">Vollzugriff</span></div><form class="user-edit" data-user-id="${escapeHtml(user.id)}"><input type="hidden" name="employeeId" value="${escapeHtml(user.employeeId)}"><label><span>Benutzername</span><input name="username" value="${escapeHtml(user.username)}" required></label><label><span>Neues Passwort</span><input name="password" type="password" minlength="8" placeholder="Unverändert"></label><label class="switch"><input name="active" type="checkbox" ${user.active ? 'checked' : ''} ${user.id === state.user.id ? 'disabled' : ''}><span>Aktiv</span></label><button class="button secondary" type="submit">Speichern</button></form></article>`).join('');
+  const options = availableEmployees.map((employee) => `<option value="${escapeHtml(employee.id)}">${escapeHtml(employee.name)} · Nr. ${escapeHtml(employee.personnelNumber)}</option>`).join('');
+  return `<section class="page people-admin"><div class="admin-create-grid"><div class="management-create card"><p class="eyebrow">Kein Login nötig</p><h2>Mitarbeiter anlegen</h2><p>Diese Person erscheint in neuen Kalenderwochen, bekommt aber kein Konto und benötigt kein Passwort.</p><form id="employee-form" class="stack-form"><label><span>Name</span><input name="name" required></label><label><span>Personalnummer</span><input name="personnelNumber" required></label><button class="button primary" type="submit">Mitarbeiter anlegen</button></form></div><div class="management-create card"><p class="eyebrow">Optionaler Zugang</p><h2>Benutzerkonto anlegen</h2><p>Nur die zwei Personen, die sich anmelden sollen, benötigen hier ein Konto. Beide haben Vollzugriff.</p><form id="user-form" class="stack-form"><label><span>Mitarbeiter</span><select name="employeeId" required><option value="">Bitte auswählen</option>${options}</select></label><label><span>Benutzername</span><input name="username" minlength="3" required></label><label><span>Startpasswort</span><input name="password" type="password" minlength="8" required></label><button class="button primary" type="submit" ${availableEmployees.length ? '' : 'disabled'}>Benutzerkonto anlegen</button></form></div></div><div class="admin-lists"><section><p class="eyebrow">Team für die Zeiterfassung</p><h2>${state.employees.length} Mitarbeiter</h2><div class="user-list">${employeeCards || '<div class="empty-card card"><p>Noch keine Mitarbeiter vorhanden.</p></div>'}</div></section><section><p class="eyebrow">Anmeldung · Vollzugriff</p><h2>${state.users.length} Benutzerkonten</h2><div class="user-list">${userCards}</div></section></div></section>`;
+}
+
 function renderImport() {
   return `<section class="page"><div class="import-layout"><div class="upload-card card"><p class="eyebrow">Optionaler Schnellstart</p><h2>Ausgefüllte Wochenmappe importieren</h2><p>Der Import ist nicht erforderlich. Neue Wochen können vollständig in der Website angelegt und gepflegt werden.</p><label class="drop-zone" id="drop-zone"><input id="file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><span class="upload-icon">⇧</span><strong>Datei auswählen oder hier ablegen</strong><span>Maximal 25 MB · nur XLSX</span></label><p class="file-name" id="file-name"></p><button id="import-button" class="button primary" disabled>Kalenderwoche importieren</button></div><div class="import-info card"><p class="eyebrow">Automatische Erkennung</p><h2>Was wird übernommen?</h2><ol><li>Kalenderwoche und Datumsbereich</li><li>Personalnummern und Namen aus dem Anwesenheitsblatt</li><li>Arbeitsbeginn, Arbeitsende und Pausen</li><li>Auftragsnummern, Bezeichnungen und Anforderer</li><li>Stundenverteilung aus den Auftragsblättern</li></ol><div class="privacy-box"><strong>Datenschutz:</strong> Die Datei wird direkt an deine eigene Instanz gesendet. Sie wird nicht dauerhaft als Datei gespeichert; nur die ausgelesenen Daten landen im Docker-Volume.</div></div></div></section>`;
 }
@@ -136,7 +147,7 @@ function renderImport() {
 function render() {
   renderHeader();
   if (state.loading) { content.innerHTML = '<div class="loading">Daten werden geladen …</div>'; return; }
-  const views = { entry: renderEntry, overview: renderOverview, orders: renderOrders, weeks: renderWeeks, users: renderUsers, import: renderImport };
+  const views = { entry: renderEntry, overview: renderOverview, orders: renderOrders, weeks: renderWeeks, users: renderPeople, import: renderImport };
   content.innerHTML = (views[state.view] || renderEntry)();
   bindContentEvents();
 }
@@ -152,6 +163,16 @@ async function saveCurrent() {
 function bindContentEvents() {
   content.querySelector('[data-action="go-import"]')?.addEventListener('click', () => { state.view = 'import'; render(); });
   content.querySelector('[data-action="go-weeks"]')?.addEventListener('click', () => { state.view = 'weeks'; render(); });
+  content.querySelector('#employee-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form)); const button = form.querySelector('button'); button.disabled = true;
+    try { await api('/api/employees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); await loadUsers(); showNotice('Mitarbeiter wurde ohne Benutzerkonto angelegt.'); render(); }
+    catch (error) { showNotice(error.message, true); button.disabled = false; }
+  });
+  content.querySelectorAll('.employee-edit').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault(); const data = Object.fromEntries(new FormData(form)); data.active = form.elements.active.checked; const button = form.querySelector('button'); button.disabled = true;
+    try { await api(`/api/employees/${encodeURIComponent(form.dataset.employeeId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); await loadUsers(); showNotice('Mitarbeiter wurde aktualisiert.'); render(); }
+    catch (error) { showNotice(error.message, true); button.disabled = false; }
+  }));
   content.querySelector('#week-form')?.addEventListener('submit', async (event) => {
     event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form)); const button = form.querySelector('button'); button.disabled = true;
     try { const result = await api('/api/weeks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); await loadWeeks(result.week.id); state.view = 'entry'; showNotice(result.message); render(); }
@@ -187,7 +208,8 @@ document.querySelector('#logout-button').addEventListener('click', async () => {
 
 async function bootstrap() {
   try {
-    const session = await api('/api/session');
+    const [health, session] = await Promise.all([api('/api/health'), api('/api/session')]);
+    state.version = health.version;
     if (session.setupRequired) return showAuth(true);
     if (!session.authenticated) return showAuth(false);
     await enterApp(session.user);
@@ -195,3 +217,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+
