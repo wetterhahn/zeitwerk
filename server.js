@@ -198,7 +198,12 @@ app.put('/api/weeks/:weekId/orders', async (request, response, next) => {
   } catch (error) { next(error); }
 });
 
-app.use(express.static(publicDirectory, { index: 'index.html', maxAge: '1h' }));
+app.use(express.static(publicDirectory, {
+  index: 'index.html',
+  etag: true,
+  maxAge: 0,
+  setHeaders: (response) => response.setHeader('Cache-Control', 'no-cache')
+}));
 app.get('*splat', (request, response) => response.sendFile(path.join(publicDirectory, 'index.html')));
 
 app.use((error, request, response, next) => {
