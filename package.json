@@ -10,7 +10,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check src/import-workbook.js && node --check public/app.js"
+    "check": "node --check server.js && node --check src/auth.js && node --check src/import-workbook.js && node --check src/week.js && node --check public/app.js"
   },
   "dependencies": {
     "exceljs": "4.4.0",
