@@ -1,5 +1,7 @@
-const state = { weeks: [], week: null, view: 'entry', selectedEmployeeId: null, dirty: false, loading: true };
+const state = { weeks: [], week: null, users: [], user: null, view: 'entry', selectedEmployeeId: null, dirty: false, loading: true };
 const content = document.querySelector('#content');
+const authShell = document.querySelector('#auth-shell');
+const appShell = document.querySelector('#app-shell');
 const weekSelect = document.querySelector('#week-select');
 const saveButton = document.querySelector('#save-button');
 const exportButton = document.querySelector('#export-button');
@@ -12,10 +14,15 @@ const formatHours = (value) => Number(value || 0).toLocaleString('de-DE', { mini
 const hoursBetween = (start, end, pause = 0) => { if (!start || !end) return 0; const [sh, sm] = start.split(':').map(Number); const [eh, em] = end.split(':').map(Number); let minutes = eh * 60 + em - sh * 60 - sm; if (minutes < 0) minutes += 1440; return Math.max(0, minutes / 60 - Number(pause || 0)); };
 const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 const initials = (name) => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+const currentIsoWeek = () => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7)); const firstThursday = new Date(date.getFullYear(), 0, 4); return { year: date.getFullYear(), weekNumber: 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getDay() + 6) % 7)) / 7) }; };
 
 async function api(url, options = {}) {
-  const response = await fetch(url, options);
+  const method = String(options.method || 'GET').toUpperCase();
+  const headers = new Headers(options.headers || {});
+  if (!['GET', 'HEAD'].includes(method)) headers.set('X-Zeitwerk-Request', '1');
+  const response = await fetch(url, { ...options, headers });
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401 && !['/api/login', '/api/session'].includes(url)) showAuth(false);
   if (!response.ok) throw new Error(data.error || 'Die Anfrage ist fehlgeschlagen.');
   return data;
 }
@@ -24,6 +31,37 @@ function showNotice(message, error = false) {
   notice.textContent = message;
   notice.className = error ? 'error' : 'show';
   window.setTimeout(() => { notice.className = ''; }, 3500);
+}
+
+function showAuth(setupRequired) {
+  appShell.hidden = true;
+  authShell.hidden = false;
+  const setupFields = setupRequired ? `<label><span>Anzeigename</span><input name="name" autocomplete="name" required></label><label><span>Personalnummer</span><input name="personnelNumber" required></label>` : '';
+  authShell.innerHTML = `<div class="auth-card card"><img class="auth-logo" src="/logo.svg" alt="gthSERVICE Zeiterfassung"><p class="eyebrow">${setupRequired ? 'Erster Start' : 'Geschützter Bereich'}</p><h1>${setupRequired ? 'Erstes Vollzugriff-Konto' : 'Willkommen zurück'}</h1><p>${setupRequired ? 'Dieses Konto richtet das System ein. Weitere Benutzer können danach angelegt werden; alle besitzen denselben Vollzugriff.' : 'Melde dich mit deinem Zeitwerk-Konto an.'}</p><form id="auth-form" class="stack-form">${setupFields}<label><span>Benutzername</span><input name="username" autocomplete="username" minlength="3" required></label><label><span>Passwort</span><input name="password" type="password" autocomplete="${setupRequired ? 'new-password' : 'current-password'}" minlength="8" required></label><p class="auth-error" id="auth-error"></p><button class="button primary" type="submit">${setupRequired ? 'System einrichten' : 'Anmelden'}</button></form></div>`;
+  authShell.querySelector('#auth-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget; const button = form.querySelector('button'); const data = Object.fromEntries(new FormData(form));
+    button.disabled = true;
+    try {
+      const result = await api(setupRequired ? '/api/setup' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      await enterApp(result.user);
+    } catch (error) { authShell.querySelector('#auth-error').textContent = error.message; button.disabled = false; }
+  });
+}
+
+async function loadUsers() {
+  const result = await api('/api/users');
+  state.users = result.users;
+}
+
+async function enterApp(user) {
+  state.user = user;
+  authShell.hidden = true;
+  appShell.hidden = false;
+  document.querySelector('#account-name').textContent = user.name;
+  document.querySelector('#account-avatar').textContent = initials(user.name) || 'U';
+  await loadUsers();
+  await loadWeeks();
 }
 
 function markDirty() { state.dirty = true; saveButton.textContent = 'Änderungen speichern'; saveButton.disabled = false; }
@@ -36,23 +74,23 @@ async function loadWeeks(preferredId) {
   state.weeks = weeks;
   const id = preferredId || state.week?.id || weeks[0]?.id;
   if (id) { const result = await api(`/api/weeks/${encodeURIComponent(id)}`); state.week = result.week; state.selectedEmployeeId = state.week.employees.some((employee) => String(employee.id) === String(state.selectedEmployeeId)) ? state.selectedEmployeeId : state.week.employees[0]?.id; }
-  else { state.week = null; state.view = 'import'; }
+  else { state.week = null; state.view = 'weeks'; }
   state.loading = false; state.dirty = false; render();
 }
 
 function renderHeader() {
-  const titles = { entry: ['Zeiterfassung', 'Wochenstunden erfassen'], overview: ['Auswertung', 'Wochenübersicht'], orders: ['Wochenplanung', 'Aufträge verwalten'], import: ['Datenübernahme', 'Excel-Datei importieren'] };
+  const titles = { entry: ['Zeiterfassung', 'Wochenstunden erfassen'], overview: ['Auswertung', 'Wochenübersicht'], orders: ['Wochenplanung', 'Aufträge verwalten'], weeks: ['Planung', 'Kalenderwochen'], users: ['Verwaltung', 'Benutzer & Zugänge'], import: ['Optionale Datenübernahme', 'Excel-Datei importieren'] };
   [sectionLabel.textContent, pageTitle.textContent] = titles[state.view];
   document.querySelectorAll('[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === state.view));
-  weekSelect.innerHTML = state.weeks.length ? state.weeks.map((week) => `<option value="${escapeHtml(week.id)}" ${state.week?.id === week.id ? 'selected' : ''}>KW ${week.weekNumber} · ${escapeHtml(week.startDate)} bis ${escapeHtml(week.endDate)}</option>`).join('') : '<option>Keine Woche importiert</option>';
+  weekSelect.innerHTML = state.weeks.length ? state.weeks.map((week) => `<option value="${escapeHtml(week.id)}" ${state.week?.id === week.id ? 'selected' : ''}>KW ${week.weekNumber} · ${escapeHtml(week.startDate)} bis ${escapeHtml(week.endDate)}</option>`).join('') : '<option>Noch keine Woche</option>';
   weekSelect.disabled = !state.weeks.length;
-  saveButton.hidden = state.view === 'import' || !state.week;
-  exportButton.hidden = state.view === 'import' || !state.week;
+  saveButton.hidden = !['entry', 'orders'].includes(state.view) || !state.week;
+  exportButton.hidden = !['entry', 'overview', 'orders'].includes(state.view) || !state.week;
   saveButton.textContent = state.dirty ? 'Änderungen speichern' : 'Gespeichert';
   saveButton.disabled = !state.dirty;
 }
 
-function renderEmpty() { return `<section class="page empty-page"><div class="empty-card card"><div class="empty-icon">⇧</div><h2>Noch keine Kalenderwoche vorhanden</h2><p>Importiere deine ausgefüllte Excel-Datei. Mitarbeiter, Aufträge und Zeitdaten werden ausschließlich daraus übernommen.</p><button class="button primary" data-action="go-import">Excel-Datei importieren</button></div></section>`; }
+function renderEmpty() { return `<section class="page empty-page"><div class="empty-card card"><div class="empty-icon">＋</div><h2>Noch keine Kalenderwoche vorhanden</h2><p>Lege eine Woche direkt in der Website an und starte sofort. Wenn bereits eine ausgefüllte Excel-Datei existiert, kann sie alternativ importiert werden.</p><div class="empty-actions"><button class="button primary" data-action="go-weeks">Woche anlegen</button><button class="button secondary" data-action="go-import">Excel optional importieren</button></div></div></section>`; }
 
 function renderEntry() {
   if (!state.week) return renderEmpty();
@@ -74,17 +112,29 @@ function orderHours(orderId) { return state.week.employees.reduce((sum, employee
 function renderOrders() {
   if (!state.week) return renderEmpty();
   const orders = state.week.orders.map((order, index) => `<article class="order-card card ${order.active ? '' : 'inactive'}" data-order="${index}"><span class="order-id">${escapeHtml(order.number)}</span><div class="order-info"><h3>${escapeHtml(order.name)}</h3><p>${order.requester ? `Anforderer: ${escapeHtml(order.requester)}` : 'Kein Anforderer eingetragen'}</p></div><div class="order-hours"><strong>${formatHours(orderHours(order.id))}</strong><span>Std. erfasst</span></div><label class="switch"><input data-field="active" type="checkbox" ${order.active ? 'checked' : ''}><span>${order.active ? 'Aktiv' : 'Inaktiv'}</span></label></article>`).join('');
-  return `<section class="page"><div class="orders-grid"><div class="order-create card"><p class="eyebrow">Neuer Wochenauftrag</p><h2>Auftrag anlegen</h2><p>Der Auftrag wird nur der importierten KW ${state.week.weekNumber} hinzugefügt.</p><form id="order-form" class="order-form"><label><span>Auftragsnummer *</span><input name="number" required placeholder="z. B. 10001"></label><label><span>Bezeichnung *</span><input name="name" required placeholder="z. B. Wartungsauftrag"></label><label><span>Anforderer</span><input name="requester" placeholder="Optional"></label><button class="button primary" type="submit">Auftrag hinzufügen</button></form></div><div class="orders-list"><p class="eyebrow">Auftragsliste</p><h2>${state.week.orders.length} Aufträge in KW ${state.week.weekNumber}</h2><div class="order-list-items">${orders || '<div class="empty-card card"><p>Noch keine Aufträge vorhanden.</p></div>'}</div></div></div></section>`;
+  return `<section class="page"><div class="orders-grid"><div class="order-create card"><p class="eyebrow">Neuer Wochenauftrag</p><h2>Auftrag anlegen</h2><p>Der Auftrag wird der aktuellen KW ${state.week.weekNumber} hinzugefügt. Die Auftragsnummer ist ein Pflichtfeld.</p><form id="order-form" class="order-form"><label><span>Auftragsnummer *</span><input name="number" required placeholder="z. B. 10001"></label><label><span>Bezeichnung *</span><input name="name" required placeholder="z. B. Wartungsauftrag"></label><label><span>Anforderer</span><input name="requester" placeholder="Optional"></label><button class="button primary" type="submit">Auftrag hinzufügen</button></form></div><div class="orders-list"><p class="eyebrow">Auftragsliste</p><h2>${state.week.orders.length} Aufträge in KW ${state.week.weekNumber}</h2><div class="order-list-items">${orders || '<div class="empty-card card"><p>Noch keine Aufträge vorhanden.</p></div>'}</div></div></div></section>`;
+}
+
+function renderWeeks() {
+  const current = currentIsoWeek();
+  const weeks = state.weeks.map((week) => `<article class="week-card card"><span class="week-badge">KW ${week.weekNumber}</span><div><h3>${escapeHtml(week.startDate)} bis ${escapeHtml(week.endDate)}</h3><p>${week.employeeCount} Benutzer · ${week.orderCount} Aufträge</p></div><span class="source-tag ${week.source === 'manual' ? 'manual' : ''}">${week.source === 'manual' ? 'Manuell' : 'Excel'}</span></article>`).join('');
+  return `<section class="page"><div class="management-layout"><div class="management-create card"><p class="eyebrow">Ohne Excel starten</p><h2>Kalenderwoche anlegen</h2><p>Alle aktiven Benutzer werden automatisch in die neue Woche übernommen. Aufträge werden anschließend passend für diese Woche angelegt.</p><form id="week-form" class="stack-form"><label><span>Jahr</span><input name="year" type="number" min="2020" max="2100" value="${current.year}" required></label><label><span>Kalenderwoche</span><input name="weekNumber" type="number" min="1" max="53" value="${current.weekNumber}" required></label><button class="button primary" type="submit">Woche anlegen</button></form><div class="info-strip"><strong>Excel ist optional.</strong><br>Eine bestehende Wochenmappe kann weiterhin über „Excel-Import“ übernommen werden.</div></div><div class="management-list"><p class="eyebrow">Vorhandene Wochen</p><h2>${state.weeks.length} Kalenderwochen</h2><div class="week-list">${weeks || '<div class="empty-card card"><p>Noch keine Woche vorhanden.</p></div>'}</div></div></div></section>`;
+}
+
+function renderUsers() {
+  const users = state.users.map((user) => `<article class="user-card card ${user.active ? '' : 'inactive'}"><div class="user-head"><span class="avatar">${escapeHtml(initials(user.name))}</span><div><h3>${escapeHtml(user.name)}</h3><p>Personal-Nr. ${escapeHtml(user.personnelNumber)}</p></div><span class="role-tag">Vollzugriff</span></div><form class="user-edit" data-user-id="${escapeHtml(user.id)}"><label><span>Name</span><input name="name" value="${escapeHtml(user.name)}" required></label><label><span>Personal-Nr.</span><input name="personnelNumber" value="${escapeHtml(user.personnelNumber)}" required></label><label><span>Benutzername</span><input name="username" value="${escapeHtml(user.username)}" required></label><label><span>Neues Passwort</span><input name="password" type="password" minlength="8" placeholder="Unverändert"></label><label class="switch"><input name="active" type="checkbox" ${user.active ? 'checked' : ''} ${user.id === state.user.id ? 'disabled' : ''}><span>Aktiv</span></label><button class="button secondary" type="submit">Speichern</button></form></article>`).join('');
+  return `<section class="page"><div class="management-layout"><div class="management-create card"><p class="eyebrow">Neuer Zugang</p><h2>Benutzer anlegen</h2><p>Jeder aktive Benutzer hat vollständigen Zugriff auf Erfassung, Wochen, Aufträge, Import und Benutzerverwaltung.</p><form id="user-form" class="stack-form"><label><span>Name</span><input name="name" required></label><label><span>Personalnummer</span><input name="personnelNumber" required></label><label><span>Benutzername</span><input name="username" minlength="3" required></label><label><span>Startpasswort</span><input name="password" type="password" minlength="8" required></label><button class="button primary" type="submit">Benutzer anlegen</button></form></div><div class="management-list"><p class="eyebrow">Vollzugriff für alle</p><h2>${state.users.length} Benutzer</h2><div class="user-list">${users}</div></div></div></section>`;
 }
 
 function renderImport() {
-  return `<section class="page"><div class="import-layout"><div class="upload-card card"><p class="eyebrow">Excel übernehmen</p><h2>Ausgefüllte Wochenmappe importieren</h2><p>Unterstützt wird die bestehende XLSX-Struktur mit „Anwesenheit“ und den einzelnen Auftragsblättern.</p><label class="drop-zone" id="drop-zone"><input id="file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><span class="upload-icon">⇧</span><strong>Datei auswählen oder hier ablegen</strong><span>Maximal 25 MB · nur XLSX</span></label><p class="file-name" id="file-name"></p><button id="import-button" class="button primary" disabled>Kalenderwoche importieren</button></div><div class="import-info card"><p class="eyebrow">Automatische Erkennung</p><h2>Was wird übernommen?</h2><ol><li>Kalenderwoche und Datumsbereich</li><li>Personalnummern und Namen aus dem Anwesenheitsblatt</li><li>Arbeitsbeginn, Arbeitsende und Pausen</li><li>Auftragsnummern, Bezeichnungen und Anforderer</li><li>Stundenverteilung aus den Auftragsblättern</li></ol><div class="privacy-box"><strong>Datenschutz:</strong> Die Datei wird direkt an deine eigene Zeitwerk-Instanz gesendet. Sie wird nicht dauerhaft als Datei gespeichert; nur die ausgelesenen Daten landen im Docker-Volume.</div></div></div></section>`;
+  return `<section class="page"><div class="import-layout"><div class="upload-card card"><p class="eyebrow">Optionaler Schnellstart</p><h2>Ausgefüllte Wochenmappe importieren</h2><p>Der Import ist nicht erforderlich. Neue Wochen können vollständig in der Website angelegt und gepflegt werden.</p><label class="drop-zone" id="drop-zone"><input id="file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><span class="upload-icon">⇧</span><strong>Datei auswählen oder hier ablegen</strong><span>Maximal 25 MB · nur XLSX</span></label><p class="file-name" id="file-name"></p><button id="import-button" class="button primary" disabled>Kalenderwoche importieren</button></div><div class="import-info card"><p class="eyebrow">Automatische Erkennung</p><h2>Was wird übernommen?</h2><ol><li>Kalenderwoche und Datumsbereich</li><li>Personalnummern und Namen aus dem Anwesenheitsblatt</li><li>Arbeitsbeginn, Arbeitsende und Pausen</li><li>Auftragsnummern, Bezeichnungen und Anforderer</li><li>Stundenverteilung aus den Auftragsblättern</li></ol><div class="privacy-box"><strong>Datenschutz:</strong> Die Datei wird direkt an deine eigene Instanz gesendet. Sie wird nicht dauerhaft als Datei gespeichert; nur die ausgelesenen Daten landen im Docker-Volume.</div></div></div></section>`;
 }
 
 function render() {
   renderHeader();
   if (state.loading) { content.innerHTML = '<div class="loading">Daten werden geladen …</div>'; return; }
-  content.innerHTML = state.view === 'entry' ? renderEntry() : state.view === 'overview' ? renderOverview() : state.view === 'orders' ? renderOrders() : renderImport();
+  const views = { entry: renderEntry, overview: renderOverview, orders: renderOrders, weeks: renderWeeks, users: renderUsers, import: renderImport };
+  content.innerHTML = (views[state.view] || renderEntry)();
   bindContentEvents();
 }
 
@@ -98,6 +148,22 @@ async function saveCurrent() {
 
 function bindContentEvents() {
   content.querySelector('[data-action="go-import"]')?.addEventListener('click', () => { state.view = 'import'; render(); });
+  content.querySelector('[data-action="go-weeks"]')?.addEventListener('click', () => { state.view = 'weeks'; render(); });
+  content.querySelector('#week-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form)); const button = form.querySelector('button'); button.disabled = true;
+    try { const result = await api('/api/weeks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); await loadWeeks(result.week.id); state.view = 'entry'; showNotice(result.message); render(); }
+    catch (error) { showNotice(error.message, true); button.disabled = false; }
+  });
+  content.querySelector('#user-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form)); const button = form.querySelector('button'); button.disabled = true;
+    try { await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); await loadUsers(); showNotice('Benutzer wurde mit Vollzugriff angelegt.'); render(); }
+    catch (error) { showNotice(error.message, true); button.disabled = false; }
+  });
+  content.querySelectorAll('.user-edit').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault(); const data = Object.fromEntries(new FormData(form)); data.active = form.elements.active.checked; const button = form.querySelector('button'); button.disabled = true;
+    try { const result = await api(`/api/users/${encodeURIComponent(form.dataset.userId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (result.user.id === state.user.id) { state.user = result.user; document.querySelector('#account-name').textContent = result.user.name; document.querySelector('#account-avatar').textContent = initials(result.user.name); } await loadUsers(); showNotice('Benutzer wurde aktualisiert.'); render(); }
+    catch (error) { showNotice(error.message, true); button.disabled = false; }
+  }));
   content.querySelectorAll('[data-employee]').forEach((button) => button.addEventListener('click', async () => { try { await saveCurrent(); state.selectedEmployeeId = button.dataset.employee; state.view = button.classList.contains('person-row') ? 'entry' : state.view; render(); } catch (error) { showNotice(error.message, true); } }));
   content.querySelectorAll('.day-card').forEach((card) => { const dayIndex = Number(card.dataset.day); card.querySelectorAll('.time-grid [data-field]').forEach((input) => input.addEventListener('change', () => { const field = input.dataset.field; currentEmployee().days[dayIndex][field] = field === 'pause' ? Number(input.value) : input.value; markDirty(); render(); })); card.querySelectorAll('.allocation').forEach((row) => { const allocationIndex = Number(row.dataset.allocation); row.querySelectorAll('[data-field]').forEach((input) => input.addEventListener('change', () => { const field = input.dataset.field; currentEmployee().days[dayIndex].allocations[allocationIndex][field] = field === 'hours' ? Number(input.value) : input.value; markDirty(); render(); })); row.querySelector('[data-action="remove-allocation"]')?.addEventListener('click', () => { currentEmployee().days[dayIndex].allocations.splice(allocationIndex, 1); markDirty(); render(); }); }); card.querySelector('[data-action="add-allocation"]')?.addEventListener('click', () => { const order = state.week.orders.find((item) => item.active); if (order) currentEmployee().days[dayIndex].allocations.push({ orderId: order.id, hours: 0 }); markDirty(); render(); }); });
   const orderForm = content.querySelector('#order-form'); orderForm?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(orderForm); state.week.orders.push({ id: `manuell-${Date.now()}`, number: String(data.get('number')).trim(), name: String(data.get('name')).trim(), requester: String(data.get('requester')).trim(), active: true }); markDirty(); render(); });
@@ -114,4 +180,15 @@ weekSelect.addEventListener('change', async () => { try { await saveCurrent(); a
 saveButton.addEventListener('click', () => saveCurrent().catch((error) => showNotice(error.message, true)));
 exportButton.addEventListener('click', () => { if (!state.week) return; const rows = [['Personal-Nr.','Mitarbeiter','Tag','Datum','Von','Bis','Pause','Netto','Auftragsnummer','Auftrag','Auftragsstunden']]; state.week.employees.forEach((employee) => { const stats = employeeStats(employee); employee.days.forEach((day, index) => { const allocations = day.allocations.length ? day.allocations : [{ orderId: '', hours: 0 }]; allocations.forEach((item) => { const order = orderById(item.orderId); rows.push([employee.id,employee.name,dayNames[index],dateForDay(index).toLocaleDateString('de-DE'),day.start,day.end,String(day.pause).replace('.',','),formatHours(stats.totals[index]),order?.number || '',order?.name || '',formatHours(item.hours)]); }); }); }); const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"','""')}"`).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = `Zeitwerk_KW${state.week.weekNumber}.csv`; link.click(); URL.revokeObjectURL(link.href); });
 
-loadWeeks().catch((error) => { state.loading = false; showNotice(error.message, true); render(); });
+document.querySelector('#logout-button').addEventListener('click', async () => { try { await api('/api/logout', { method: 'POST' }); state.user = null; state.week = null; showAuth(false); } catch (error) { showNotice(error.message, true); } });
+
+async function bootstrap() {
+  try {
+    const session = await api('/api/session');
+    if (session.setupRequired) return showAuth(true);
+    if (!session.authenticated) return showAuth(false);
+    await enterApp(session.user);
+  } catch (error) { authShell.hidden = false; authShell.innerHTML = `<div class="auth-card card"><h1>Verbindung fehlgeschlagen</h1><p>${escapeHtml(error.message)}</p></div>`; }
+}
+
+bootstrap();
