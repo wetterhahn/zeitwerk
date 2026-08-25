@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#134b3c">
+    <meta name="description" content="Selbst gehostete Wochenzeiterfassung mit Excel-Import">
+    <title>Zeitwerk</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">Z</span><span><strong>Zeitwerk</strong><small>Wochenstunden</small></span></div>
+        <nav aria-label="Hauptnavigation">
+          <button data-view="entry"><i>◫</i> Erfassung</button>
+          <button data-view="overview"><i>▥</i> Wochenübersicht</button>
+          <button data-view="orders"><i>◌</i> Aufträge</button>
+          <button data-view="import"><i>⇧</i> Excel-Import</button>
+        </nav>
+        <div class="storage-note"><span></span> Zentral gespeichert<small>Die Daten liegen im Docker-Volume.</small></div>
+      </aside>
+      <main>
+        <header class="topbar">
+          <div><p class="eyebrow" id="section-label">Zeiterfassung</p><h1 id="page-title">Zeitwerk</h1></div>
+          <div class="header-actions"><select id="week-select" aria-label="Kalenderwoche"></select><button id="export-button" class="button secondary">CSV exportieren</button><button id="save-button" class="button primary">Gespeichert</button></div>
+        </header>
+        <div id="notice" role="status" aria-live="polite"></div>
+        <div id="content"></div>
+      </main>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
