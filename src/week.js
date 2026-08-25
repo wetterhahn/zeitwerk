@@ -8,7 +8,7 @@ function isoWeekStart(year, weekNumber) {
 
 const isoDate = (date) => date.toISOString().slice(0, 10);
 
-export function createManualWeek({ year, weekNumber, users }) {
+export function createManualWeek({ year, weekNumber, employees }) {
   const numericYear = Number(year);
   const numericWeek = Number(weekNumber);
   if (!Number.isInteger(numericYear) || numericYear < 2020 || numericYear > 2100) throw new Error('Bitte ein gültiges Jahr eintragen.');
@@ -28,11 +28,12 @@ export function createManualWeek({ year, weekNumber, users }) {
     importedAt: null,
     createdAt: now,
     updatedAt: now,
-    employees: users.filter((user) => user.active).map((user) => ({
-      id: user.personnelNumber,
-      name: user.name,
+    employees: employees.filter((employee) => employee.active).map((employee) => ({
+      id: employee.personnelNumber,
+      name: employee.name,
       days: Array.from({ length: 5 }, () => ({ start: '', end: '', pause: 0, allocations: [] }))
     })),
     orders: []
   };
 }
+
