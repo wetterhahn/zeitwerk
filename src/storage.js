@@ -5,7 +5,7 @@ const dataDirectory = process.env.DATA_DIR || path.resolve('data');
 const storePath = path.join(dataDirectory, 'store.json');
 let writeQueue = Promise.resolve();
 
-const emptyStore = () => ({ schemaVersion: 1, weeks: {} });
+const emptyStore = () => ({ schemaVersion: 2, users: [], weeks: {} });
 
 export async function readStore() {
   await fs.mkdir(dataDirectory, { recursive: true });
@@ -13,7 +13,7 @@ export async function readStore() {
     const contents = await fs.readFile(storePath, 'utf8');
     const parsed = JSON.parse(contents);
     if (!parsed.weeks || typeof parsed.weeks !== 'object') throw new Error('Ungültiger Datenspeicher');
-    return parsed;
+    return { ...parsed, schemaVersion: 2, users: Array.isArray(parsed.users) ? parsed.users : [] };
   } catch (error) {
     if (error.code === 'ENOENT') return emptyStore();
     throw error;
