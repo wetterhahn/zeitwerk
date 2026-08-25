@@ -1,8 +1,8 @@
 # Zeitwerk
 
-Selbst gehostete Wochenzeiterfassung mit Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
+Selbst gehostete Wochenzeiterfassung mit Benutzerverwaltung und optionalem Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
 
-Im Repository sind keine Mitarbeiter, Namen, Personalnummern, Auftragsnummern oder Zeitdaten enthalten. Diese Daten entstehen erst durch einen Import in der laufenden Instanz.
+Im Repository sind keine Mitarbeiter, Namen, Adressen, Personalnummern, Auftragsnummern oder Zeitdaten enthalten. Diese Daten entstehen ausschließlich in der laufenden Instanz.
 
 ## Installation mit Portainer
 
@@ -18,9 +18,17 @@ Im Repository sind keine Mitarbeiter, Namen, Personalnummern, Auftragsnummern od
 5. **Deploy the stack** auswählen.
 6. Zeitwerk anschließend unter `http://SERVER-IP:8080` öffnen.
 
-Falls Port 8080 bereits belegt ist, kann in `docker-compose.yml` beispielsweise `8090:3000` verwendet werden.
+Falls Port 8080 bereits belegt ist, kann in `docker-compose.yml` beispielsweise `8090:3000` verwendet werden. Beim ersten Aufruf wird das erste Vollzugriff-Konto eingerichtet.
 
-## Excel-Datei importieren
+## Ohne Excel verwenden
+
+1. Unter **Benutzer** alle benötigten Benutzerkonten anlegen. Jedes Konto hat Vollzugriff.
+2. Unter **Kalenderwochen** Jahr und Kalenderwoche auswählen.
+3. Die Woche anlegen. Alle aktiven Benutzer werden automatisch übernommen.
+4. Unter **Aufträge** die wöchentlich benötigten Aufträge mit verpflichtender Auftragsnummer erfassen.
+5. Arbeitszeiten anschließend direkt unter **Erfassung** eintragen.
+
+## Excel-Datei optional importieren
 
 1. In Zeitwerk den Bereich **Excel-Import** öffnen.
 2. Die ausgefüllte `.xlsx`-Wochenmappe auswählen oder in das Upload-Feld ziehen.
@@ -46,9 +54,9 @@ Für eine Sicherung muss das Volume `zeitwerk_data` regelmäßig gesichert werde
 
 In Portainer den Stack öffnen, **Pull latest image** beziehungsweise **Re-pull image** aktivieren und den Stack erneut bereitstellen. Das Daten-Volume bleibt dabei erhalten.
 
-## Sicherheit
+## Benutzer und Sicherheit
 
-Zeitwerk enthält derzeit keine eigene Anmeldung. Die Anwendung sollte deshalb nur im internen Netz veröffentlicht oder hinter einem Reverse Proxy mit Zugangsschutz betrieben werden. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
+Zeitwerk besitzt eine eigene Anmeldung. Passwörter werden mit `scrypt` und einem individuellen Salt gehasht gespeichert; alle aktiven Konten haben bewusst dieselbe Berechtigungsstufe **Vollzugriff**. Sitzungen laufen nach zwölf Stunden ab und werden beim Neustart des Containers beendet. Für den Einsatz außerhalb des internen Netzes wird zusätzlich HTTPS über einen Reverse Proxy empfohlen. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
 
 ## Lokale Entwicklung
 
