@@ -5,7 +5,21 @@ const dataDirectory = process.env.DATA_DIR || path.resolve('data');
 const storePath = path.join(dataDirectory, 'store.json');
 let writeQueue = Promise.resolve();
 
-const emptyStore = () => ({ schemaVersion: 2, users: [], weeks: {} });
+const emptyStore = () => ({ schemaVersion: 3, users: [], employees: [], weeks: {} });
+
+function migrateStore(parsed) {
+  const users = Array.isArray(parsed.users) ? parsed.users : [];
+  const employees = Array.isArray(parsed.employees) ? parsed.employees : [];
+  for (const user of users) {
+    let employee = employees.find((item) => String(item.personnelNumber) === String(user.personnelNumber));
+    if (!employee) {
+      employee = { id: user.employeeId || user.id, name: user.name, personnelNumber: String(user.personnelNumber), active: user.active !== false, createdAt: user.createdAt || new Date().toISOString() };
+      employees.push(employee);
+    }
+    user.employeeId = employee.id;
+  }
+  return { ...parsed, schemaVersion: 3, users, employees };
+}
 
 export async function readStore() {
   await fs.mkdir(dataDirectory, { recursive: true });
@@ -13,7 +27,7 @@ export async function readStore() {
     const contents = await fs.readFile(storePath, 'utf8');
     const parsed = JSON.parse(contents);
     if (!parsed.weeks || typeof parsed.weeks !== 'object') throw new Error('Ungültiger Datenspeicher');
-    return { ...parsed, schemaVersion: 2, users: Array.isArray(parsed.users) ? parsed.users : [] };
+    return migrateStore(parsed);
   } catch (error) {
     if (error.code === 'ENOENT') return emptyStore();
     throw error;
@@ -29,3 +43,4 @@ export function writeStore(store) {
   });
   return writeQueue;
 }
+
