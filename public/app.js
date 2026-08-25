@@ -1,5 +1,6 @@
 const state = { weeks: [], week: null, users: [], user: null, view: 'entry', selectedEmployeeId: null, dirty: false, loading: true };
 const content = document.querySelector('#content');
+const bootFallback = document.querySelector('#boot-fallback');
 const authShell = document.querySelector('#auth-shell');
 const appShell = document.querySelector('#app-shell');
 const weekSelect = document.querySelector('#week-select');
@@ -34,6 +35,7 @@ function showNotice(message, error = false) {
 }
 
 function showAuth(setupRequired) {
+  bootFallback.hidden = true;
   appShell.hidden = true;
   authShell.hidden = false;
   const setupFields = setupRequired ? `<label><span>Anzeigename</span><input name="name" autocomplete="name" required></label><label><span>Personalnummer</span><input name="personnelNumber" required></label>` : '';
@@ -55,6 +57,7 @@ async function loadUsers() {
 }
 
 async function enterApp(user) {
+  bootFallback.hidden = true;
   state.user = user;
   authShell.hidden = true;
   appShell.hidden = false;
@@ -188,7 +191,7 @@ async function bootstrap() {
     if (session.setupRequired) return showAuth(true);
     if (!session.authenticated) return showAuth(false);
     await enterApp(session.user);
-  } catch (error) { authShell.hidden = false; authShell.innerHTML = `<div class="auth-card card"><h1>Verbindung fehlgeschlagen</h1><p>${escapeHtml(error.message)}</p></div>`; }
+  } catch (error) { bootFallback.querySelector('strong').textContent = 'Verbindung fehlgeschlagen'; bootFallback.querySelector('span').textContent = error.message; }
 }
 
 bootstrap();
