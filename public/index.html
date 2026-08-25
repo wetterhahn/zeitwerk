@@ -3,26 +3,35 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#134b3c">
-    <meta name="description" content="Selbst gehostete Wochenzeiterfassung mit Excel-Import">
-    <title>Zeitwerk</title>
+    <meta name="theme-color" content="#f4511e">
+    <meta name="description" content="Selbst gehostete Zeiterfassung mit optionalem Excel-Import">
+    <title>gthSERVICE Zeiterfassung</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/theme.css">
   </head>
   <body>
-    <div class="app-shell">
+    <section id="auth-shell" class="auth-shell" hidden></section>
+    <div id="app-shell" class="app-shell" hidden>
       <aside class="sidebar">
-        <div class="brand"><span class="brand-mark">Z</span><span><strong>Zeitwerk</strong><small>Wochenstunden</small></span></div>
+        <div class="brand"><img src="/logo.svg" alt="gthSERVICE Zeiterfassung"></div>
         <nav aria-label="Hauptnavigation">
           <button data-view="entry"><i>◫</i> Erfassung</button>
           <button data-view="overview"><i>▥</i> Wochenübersicht</button>
-          <button data-view="orders"><i>◌</i> Aufträge</button>
-          <button data-view="import"><i>⇧</i> Excel-Import</button>
+          <button data-view="orders"><i>◎</i> Aufträge</button>
+          <button data-view="weeks"><i>＋</i> Kalenderwochen</button>
+          <button data-view="users"><i>♟</i> Benutzer</button>
+          <button data-view="import"><i>⇧</i> Excel-Import <em>optional</em></button>
         </nav>
-        <div class="storage-note"><span></span> Zentral gespeichert<small>Die Daten liegen im Docker-Volume.</small></div>
+        <div class="account-box">
+          <span class="account-avatar" id="account-avatar">–</span>
+          <span><strong id="account-name">Benutzer</strong><small>Vollzugriff</small></span>
+          <button id="logout-button" title="Abmelden" aria-label="Abmelden">↪</button>
+        </div>
       </aside>
       <main>
         <header class="topbar">
-          <div><p class="eyebrow" id="section-label">Zeiterfassung</p><h1 id="page-title">Zeitwerk</h1></div>
+          <div><p class="eyebrow" id="section-label">Zeiterfassung</p><h1 id="page-title">Wochenstunden erfassen</h1></div>
           <div class="header-actions"><select id="week-select" aria-label="Kalenderwoche"></select><button id="export-button" class="button secondary">CSV exportieren</button><button id="save-button" class="button primary">Gespeichert</button></div>
         </header>
         <div id="notice" role="status" aria-live="polite"></div>
