@@ -6,27 +6,28 @@
     <meta name="theme-color" content="#f4511e">
     <meta name="description" content="Selbst gehostete Zeiterfassung mit optionalem Excel-Import">
     <title>gthSERVICE Zeiterfassung</title>
-    <link rel="icon" href="/favicon.svg?v=3" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css?v=3">
-    <link rel="stylesheet" href="/theme.css?v=3">
+    <link rel="icon" href="/favicon.svg?v=4" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css?v=4">
+    <link rel="stylesheet" href="/theme.css?v=4">
   </head>
   <body>
-    <div id="boot-fallback" class="boot-fallback"><img src="/logo.svg?v=3" alt="gthSERVICE Zeiterfassung"><strong>Anwendung wird geladen …</strong><span>Falls diese Anzeige bleibt, bitte die Seite einmal neu laden.</span></div>
+    <div id="boot-fallback" class="boot-fallback"><img src="/logo.svg?v=4" alt="gthSERVICE Zeiterfassung"><strong>Anwendung wird geladen …</strong><span>Falls diese Anzeige bleibt, bitte die Seite einmal neu laden.</span></div>
     <section id="auth-shell" class="auth-shell" hidden></section>
     <div id="app-shell" class="app-shell" hidden>
       <aside class="sidebar">
-        <div class="brand"><img src="/logo.svg?v=3" alt="gthSERVICE Zeiterfassung"></div>
+        <div class="brand"><img src="/logo.svg?v=4" alt="gthSERVICE Zeiterfassung"></div>
         <nav aria-label="Hauptnavigation">
           <button data-view="entry"><i>◫</i> Erfassung</button>
           <button data-view="overview"><i>▥</i> Wochenübersicht</button>
           <button data-view="orders"><i>◎</i> Aufträge</button>
           <button data-view="weeks"><i>＋</i> Kalenderwochen</button>
-          <button data-view="users"><i>♟</i> Benutzer</button>
+          <button data-view="users"><i>♟</i> Mitarbeiter & Konten</button>
           <button data-view="import"><i>⇧</i> Excel-Import <em>optional</em></button>
         </nav>
         <div class="account-box">
           <span class="account-avatar" id="account-avatar">–</span>
           <span><strong id="account-name">Benutzer</strong><small>Vollzugriff</small></span>
+          <span class="app-version" id="app-version" title="Installierte Version">Version</span>
           <button id="logout-button" title="Abmelden" aria-label="Abmelden">↪</button>
         </div>
       </aside>
@@ -39,6 +40,7 @@
         <div id="content"></div>
       </main>
     </div>
-    <script type="module" src="/app.js?v=3"></script>
+    <script type="module" src="/app.js?v=4"></script>
   </body>
 </html>
+
