@@ -18,8 +18,8 @@ test('normalizes and validates account fields', () => {
   assert.equal(result.personnelNumber, '101');
 });
 
-test('creates a manual week from active users', () => {
-  const week = createManualWeek({ year: 2026, weekNumber: 25, users: [
+test('creates a manual week from active employees without accounts', () => {
+  const week = createManualWeek({ year: 2026, weekNumber: 25, employees: [
     { name: 'Beispiel Eins', personnelNumber: '101', active: true },
     { name: 'Beispiel Zwei', personnelNumber: '102', active: false }
   ] });
@@ -30,3 +30,4 @@ test('creates a manual week from active users', () => {
   assert.equal(week.employees[0].days.length, 5);
   assert.equal(week.source, 'manual');
 });
+
