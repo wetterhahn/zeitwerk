@@ -57,10 +57,20 @@ export function publicUser(user) {
     username: user.username,
     name: user.name,
     personnelNumber: user.personnelNumber,
+    employeeId: user.employeeId,
     active: user.active,
     role: 'Vollzugriff',
     createdAt: user.createdAt
   };
+}
+
+export function validateEmployee(body) {
+  const name = String(body.name || '').trim();
+  const personnelNumber = String(body.personnelNumber || '').trim();
+  if (!name) throw new Error('Bitte einen Namen eintragen.');
+  if (!personnelNumber) throw new Error('Bitte eine Personalnummer eintragen.');
+  if (personnelNumber.length > 40) throw new Error('Die Personalnummer darf höchstens 40 Zeichen lang sein.');
+  return { name, personnelNumber };
 }
 
 export function validateCredentials(body, requirePassword = true) {
@@ -75,3 +85,4 @@ export function validateCredentials(body, requirePassword = true) {
   if (!requirePassword && password && password.length < 8) throw new Error('Ein neues Passwort muss mindestens 8 Zeichen lang sein.');
   return { username, name, personnelNumber, password };
 }
+
