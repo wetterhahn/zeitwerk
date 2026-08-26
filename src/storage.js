@@ -5,7 +5,7 @@ const dataDirectory = process.env.DATA_DIR || path.resolve('data');
 const storePath = path.join(dataDirectory, 'store.json');
 let writeQueue = Promise.resolve();
 
-const emptyStore = () => ({ schemaVersion: 3, users: [], employees: [], weeks: {} });
+const emptyStore = () => ({ schemaVersion: 4, users: [], employees: [], weeks: {} });
 
 function migrateStore(parsed) {
   const users = Array.isArray(parsed.users) ? parsed.users : [];
@@ -18,7 +18,11 @@ function migrateStore(parsed) {
     }
     user.employeeId = employee.id;
   }
-  return { ...parsed, schemaVersion: 3, users, employees };
+  const weeks = parsed.weeks || {};
+  for (const week of Object.values(weeks)) {
+    week.orders = Array.isArray(week.orders) ? week.orders.map((order) => ({ description: '', requester: '', active: true, ...order })) : [];
+  }
+  return { ...parsed, schemaVersion: 4, users, employees, weeks };
 }
 
 export async function readStore() {
