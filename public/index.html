@@ -6,29 +6,38 @@
     <meta name="theme-color" content="#f4511e">
     <meta name="description" content="Selbst gehostete Zeiterfassung mit optionalem Excel-Import">
     <title>gthSERVICE Zeiterfassung</title>
-    <link rel="icon" href="/favicon.svg?v=4" type="image/svg+xml">
-    <link rel="stylesheet" href="/styles.css?v=4">
-    <link rel="stylesheet" href="/theme.css?v=4">
+    <link rel="icon" href="/favicon.svg?v=5" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css?v=5">
+    <link rel="stylesheet" href="/theme.css?v=5">
   </head>
   <body>
-    <div id="boot-fallback" class="boot-fallback"><img src="/logo.svg?v=4" alt="gthSERVICE Zeiterfassung"><strong>Anwendung wird geladen …</strong><span>Falls diese Anzeige bleibt, bitte die Seite einmal neu laden.</span></div>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="icon-overview" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M9 10v9M15 10v9"/></symbol>
+      <symbol id="icon-orders" viewBox="0 0 24 24"><path d="M8 5h11v15H5V8zM8 5v3H5M9 12h6M9 16h6"/></symbol>
+      <symbol id="icon-calendar" viewBox="0 0 24 24"><path d="M5 6h14v14H5zM8 4v4M16 4v4M5 10h14M12 13v5M9.5 15.5h5"/></symbol>
+      <symbol id="icon-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-4 2.2-6 5.5-6s5 2 5.5 6M15 6.5a3 3 0 0 1 0 5.5M16 14c2.5.5 3.8 2.2 4.2 5"/></symbol>
+      <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4M8 8l4-4 4 4M5 14v6h14v-6"/></symbol>
+      <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></symbol>
+    </svg>
+    <div id="boot-fallback" class="boot-fallback"><img src="/logo.svg?v=5" alt="gthSERVICE Zeiterfassung"><strong>Anwendung wird geladen …</strong><span>Falls diese Anzeige bleibt, bitte die Seite einmal neu laden.</span></div>
     <section id="auth-shell" class="auth-shell" hidden></section>
     <div id="app-shell" class="app-shell" hidden>
       <aside class="sidebar">
-        <div class="brand"><img src="/logo.svg?v=4" alt="gthSERVICE Zeiterfassung"></div>
+        <div class="brand"><img src="/logo.svg?v=5" alt="gthSERVICE Zeiterfassung"></div>
         <nav aria-label="Hauptnavigation">
-          <button data-view="entry"><i>◫</i> Erfassung</button>
-          <button data-view="overview"><i>▥</i> Wochenübersicht</button>
-          <button data-view="orders"><i>◎</i> Aufträge</button>
-          <button data-view="weeks"><i>＋</i> Kalenderwochen</button>
-          <button data-view="users"><i>♟</i> Mitarbeiter & Konten</button>
-          <button data-view="import"><i>⇧</i> Excel-Import <em>optional</em></button>
+          <button data-view="entry"><svg class="nav-icon" aria-hidden="true"><use href="#icon-clock"/></svg> Erfassung</button>
+          <button data-view="overview"><svg class="nav-icon" aria-hidden="true"><use href="#icon-overview"/></svg> Wochenübersicht</button>
+          <button data-view="orders"><svg class="nav-icon" aria-hidden="true"><use href="#icon-orders"/></svg> Aufträge</button>
+          <button data-view="weeks"><svg class="nav-icon" aria-hidden="true"><use href="#icon-calendar"/></svg> Kalenderwochen</button>
+          <button data-view="users"><svg class="nav-icon" aria-hidden="true"><use href="#icon-people"/></svg> Mitarbeiter</button>
+          <button data-view="import"><svg class="nav-icon" aria-hidden="true"><use href="#icon-upload"/></svg> Excel-Import <em>optional</em></button>
         </nav>
         <div class="account-box">
           <span class="account-avatar" id="account-avatar">–</span>
           <span><strong id="account-name">Benutzer</strong><small>Vollzugriff</small></span>
           <span class="app-version" id="app-version" title="Installierte Version">Version</span>
-          <button id="logout-button" title="Abmelden" aria-label="Abmelden">↪</button>
+          <button id="logout-button" title="Abmelden" aria-label="Abmelden"><svg class="logout-icon" aria-hidden="true"><use href="#icon-logout"/></svg></button>
         </div>
       </aside>
       <main>
@@ -40,7 +49,7 @@
         <div id="content"></div>
       </main>
     </div>
-    <script type="module" src="/app.js?v=4"></script>
+    <script type="module" src="/app.js?v=5"></script>
   </body>
 </html>
 
