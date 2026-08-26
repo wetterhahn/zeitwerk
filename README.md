@@ -1,6 +1,6 @@
 # Zeitwerk
 
-Aktuelle Version: **v1.3.0**
+Aktuelle Version: **v1.3.1**
 
 Selbst gehostete Wochenzeiterfassung mit gemeinsamer Mitarbeiterverwaltung, optionalen Anmeldekonten und optionalem Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
 
@@ -63,7 +63,7 @@ Mitarbeiter sind reine Stammdaten für die Zeiterfassung und benötigen standard
 
 Mitarbeiter können wieder gelöscht werden. Dabei werden Stammdaten und ein zugehöriges Anmeldekonto entfernt; bereits erfasste Wochen bleiben bewusst als Historie erhalten. Der eigene angemeldete Mitarbeiter ist gegen versehentliches Löschen geschützt.
 
-Neue Passwörter benötigen mindestens 15 Zeichen und werden mit gehärteten `scrypt`-Parametern sowie individuellem Salt gespeichert. Ältere Hashes werden beim nächsten erfolgreichen Login automatisch aktualisiert. Fehlversuche werden gedrosselt, Sitzungen nach 30 Minuten Inaktivität oder spätestens acht Stunden beendet und bei Passwortänderung beziehungsweise Kontolöschung serverseitig widerrufen. Cookies verwenden `HttpOnly`, `SameSite=Strict` und unter HTTPS zusätzlich `Secure`. Für jeden Zugriff außerhalb eines vollständig vertrauenswürdigen internen Netzes ist HTTPS über einen Reverse Proxy erforderlich.
+Neue Passwörter benötigen mindestens 8 Zeichen und werden mit gehärteten `scrypt`-Parametern sowie individuellem Salt gespeichert. Ältere Hashes werden beim nächsten erfolgreichen Login automatisch aktualisiert. Fehlversuche werden gedrosselt, Sitzungen nach 30 Minuten Inaktivität oder spätestens acht Stunden beendet und bei Passwortänderung beziehungsweise Kontolöschung serverseitig widerrufen. Cookies verwenden `HttpOnly`, `SameSite=Strict` und unter HTTPS zusätzlich `Secure`. Für jeden Zugriff außerhalb eines vollständig vertrauenswürdigen internen Netzes ist HTTPS über einen Reverse Proxy erforderlich.
 
 ## Lokale Entwicklung
 

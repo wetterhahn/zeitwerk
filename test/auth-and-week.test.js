@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { passwordMatches, passwordNeedsUpgrade, passwordRecord, publicUser, validateCredentials } from '../src/auth.js';
 import { createManualWeek } from '../src/week.js';
 
 test('hashes passwords and never exposes password data', async () => {
-  const record = await passwordRecord('sicheres-passwort');
+  const record = await passwordRecord('12345678');
   const user = { id: 'u1', username: 'beispiel', name: 'Beispiel', personnelNumber: '101', active: true, createdAt: '2026-01-01', ...record };
-  assert.equal(await passwordMatches('sicheres-passwort', user), true);
+  assert.equal(await passwordMatches('12345678', user), true);
   assert.equal(await passwordMatches('falsch', user), false);
   assert.equal(record.passwordN, 2 ** 17);
   assert.equal(passwordNeedsUpgrade(user), false);
@@ -14,11 +15,17 @@ test('hashes passwords and never exposes password data', async () => {
   assert.equal(publicUser(user).role, 'Vollzugriff');
 });
 
+test('allows eight-character passwords in the browser login form', () => {
+  const appSource = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(appSource, /autocomplete="\$\{setupRequired \? 'new-password' : 'current-password'\}" minlength="8"/);
+  assert.doesNotMatch(appSource, /minlength="15"/);
+});
+
 test('normalizes and validates account fields', () => {
-  const result = validateCredentials({ username: '  Test.User ', name: 'Beispiel', personnelNumber: ' 101 ', password: '123456789012345' });
+  const result = validateCredentials({ username: '  Test.User ', name: 'Beispiel', personnelNumber: ' 101 ', password: '12345678' });
   assert.equal(result.username, 'test.user');
   assert.equal(result.personnelNumber, '101');
-  assert.throws(() => validateCredentials({ username: 'test.user', name: 'Beispiel', personnelNumber: '101', password: '12345678' }), /15 Zeichen/);
+  assert.throws(() => validateCredentials({ username: 'test.user', name: 'Beispiel', personnelNumber: '101', password: '1234567' }), /8 Zeichen/);
 });
 
 test('creates a manual week from active employees without accounts', () => {

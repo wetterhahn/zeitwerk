@@ -6,6 +6,7 @@ const sessions = new Map();
 const sessionAbsoluteLifetime = 8 * 60 * 60 * 1000;
 const sessionIdleLifetime = 30 * 60 * 1000;
 const currentScrypt = { N: 2 ** 17, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
+const minimumPasswordLength = 8;
 
 const sessionKey = (token) => crypto.createHash('sha256').update(token).digest('hex');
 const cookieName = (secure) => secure ? '__Host-zeitwerk_session' : 'zeitwerk_session';
@@ -111,8 +112,8 @@ export function validateCredentials(body, requirePassword = true) {
   if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw new Error('Der Benutzername benötigt 3 bis 40 Zeichen und darf nur Buchstaben, Zahlen, Punkt, Unterstrich und Bindestrich enthalten.');
   if (!name) throw new Error('Bitte einen Anzeigenamen eintragen.');
   if (!personnelNumber) throw new Error('Bitte eine Personalnummer eintragen.');
-  if (requirePassword && password.length < 15) throw new Error('Das Passwort muss mindestens 15 Zeichen lang sein.');
-  if (!requirePassword && password && password.length < 15) throw new Error('Ein neues Passwort muss mindestens 15 Zeichen lang sein.');
+  if (requirePassword && password.length < minimumPasswordLength) throw new Error(`Das Passwort muss mindestens ${minimumPasswordLength} Zeichen lang sein.`);
+  if (!requirePassword && password && password.length < minimumPasswordLength) throw new Error(`Ein neues Passwort muss mindestens ${minimumPasswordLength} Zeichen lang sein.`);
   if (password.length > 200) throw new Error('Das Passwort darf höchstens 200 Zeichen lang sein.');
   return { username, name, personnelNumber, password };
 }
