@@ -35,6 +35,7 @@ const credentialsFrom = (body, requirePassword = true) => {
 };
 const duplicateUser = (users, credentials, excludedId) => users.find((user) => user.id !== excludedId && user.username === credentials.username);
 const employeeFrom = (store, employeeId) => store.employees.find((employee) => employee.id === employeeId);
+const employeeWithAccount = (store, employee) => ({ ...employee, account: store.users.find((user) => user.employeeId === employee.id) ? publicUser(store.users.find((user) => user.employeeId === employee.id)) : null });
 
 app.get('/api/health', (request, response) => response.json({ status: 'ok', version: appVersion }));
 app.get('/api/session', async (request, response, next) => {
@@ -105,7 +106,7 @@ app.get('/api/users', async (request, response, next) => {
 app.get('/api/employees', async (request, response, next) => {
   try {
     const store = await readStore();
-    response.json({ employees: store.employees });
+    response.json({ employees: store.employees.map((employee) => employeeWithAccount(store, employee)) });
   } catch (error) { next(error); }
 });
 
@@ -115,9 +116,15 @@ app.post('/api/employees', async (request, response, next) => {
     const details = validateEmployee(request.body);
     if (store.employees.some((employee) => String(employee.personnelNumber) === details.personnelNumber)) return response.status(409).json({ error: 'Diese Personalnummer ist bereits vergeben.' });
     const employee = { id: crypto.randomUUID(), ...details, active: true, createdAt: new Date().toISOString() };
+    if (request.body.loginEnabled === true) {
+      const credentials = credentialsFrom({ ...request.body, ...details });
+      if (duplicateUser(store.users, credentials)) return response.status(409).json({ error: 'Dieser Benutzername ist bereits vergeben.' });
+      const password = await passwordRecord(credentials.password);
+      store.users.push({ id: crypto.randomUUID(), employeeId: employee.id, username: credentials.username, name: employee.name, personnelNumber: employee.personnelNumber, active: true, createdAt: new Date().toISOString(), ...password });
+    }
     store.employees.push(employee);
     await writeStore(store);
-    response.status(201).json({ employee });
+    response.status(201).json({ employee: employeeWithAccount(store, employee) });
   } catch (error) { error.status ||= 400; next(error); }
 });
 
@@ -128,10 +135,26 @@ app.put('/api/employees/:employeeId', async (request, response, next) => {
     if (!employee) return response.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
     const details = validateEmployee(request.body);
     if (store.employees.some((item) => item.id !== employee.id && String(item.personnelNumber) === details.personnelNumber)) return response.status(409).json({ error: 'Diese Personalnummer ist bereits vergeben.' });
-    Object.assign(employee, details, { active: request.body.active !== false });
-    store.users.filter((user) => user.employeeId === employee.id).forEach((user) => Object.assign(user, { name: employee.name, personnelNumber: employee.personnelNumber }));
+    const active = request.body.active !== false;
+    const userIndex = store.users.findIndex((user) => user.employeeId === employee.id);
+    const user = userIndex >= 0 ? store.users[userIndex] : null;
+    if (request.body.loginEnabled === true) {
+      const credentials = credentialsFrom({ ...request.body, ...details }, !user);
+      if (duplicateUser(store.users, credentials, user?.id)) return response.status(409).json({ error: 'Dieser Benutzername ist bereits vergeben.' });
+      if (user) {
+        Object.assign(user, { username: credentials.username, name: details.name, personnelNumber: details.personnelNumber, active });
+        if (credentials.password) Object.assign(user, await passwordRecord(credentials.password));
+      } else {
+        const password = await passwordRecord(credentials.password);
+        store.users.push({ id: crypto.randomUUID(), employeeId: employee.id, username: credentials.username, name: details.name, personnelNumber: details.personnelNumber, active, createdAt: new Date().toISOString(), ...password });
+      }
+    } else if (user) {
+      if (user.id === request.currentUser.id) return response.status(400).json({ error: 'Die Anmeldung des eigenen Kontos kann nicht entfernt werden.' });
+      store.users.splice(userIndex, 1);
+    }
+    Object.assign(employee, details, { active });
     await writeStore(store);
-    response.json({ employee });
+    response.json({ employee: employeeWithAccount(store, employee) });
   } catch (error) { error.status ||= 400; next(error); }
 });
 
@@ -241,7 +264,18 @@ app.put('/api/weeks/:weekId/orders', async (request, response, next) => {
     const week = store.weeks[request.params.weekId];
     if (!week) return response.status(404).json({ error: 'Kalenderwoche nicht gefunden.' });
     if (!Array.isArray(request.body.orders) || request.body.orders.some((order) => !String(order.number || '').trim() || !String(order.name || '').trim())) return response.status(400).json({ error: 'Jeder Auftrag benötigt Auftragsnummer und Bezeichnung.' });
-    week.orders = request.body.orders;
+    week.orders = request.body.orders.map((order) => ({ ...order, number: String(order.number).trim(), name: String(order.name).trim(), description: String(order.description || '').trim(), requester: String(order.requester || '').trim(), active: order.active !== false }));
+    if (Array.isArray(request.body.employees)) {
+      const validOrderIds = new Set(week.orders.map((order) => order.id));
+      for (const incoming of request.body.employees) {
+        const employee = week.employees.find((item) => String(item.id) === String(incoming.id));
+        if (!employee || !Array.isArray(incoming.days) || incoming.days.length !== 5) continue;
+        incoming.days.forEach((day, dayIndex) => {
+          if (!Array.isArray(day.allocations)) return;
+          employee.days[dayIndex].allocations = day.allocations.filter((allocation) => validOrderIds.has(allocation.orderId) && Number(allocation.hours) >= 0).map((allocation) => ({ orderId: allocation.orderId, hours: Number(allocation.hours) }));
+        });
+      }
+    }
     week.updatedAt = new Date().toISOString();
     await writeStore(store);
     response.json({ orders: week.orders });
