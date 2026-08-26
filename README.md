@@ -75,4 +75,3 @@ pnpm start
 ```
 
 Danach ist die Anwendung unter `http://localhost:3000` erreichbar.
-

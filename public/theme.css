@@ -85,6 +85,12 @@ body { background-image: radial-gradient(circle at 85% 0, #fff0e9 0, transparent
 .employee-unified-form .login-toggle { min-width: 175px; height: 42px; }
 .login-fields { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 13px; border-radius: 8px; background: #faf6f3; border: 1px solid var(--line); }
 .stack-form .login-fields { display: grid; }
+.employee-actions { display: flex; gap: 8px; align-items: center; }
+.employee-actions .button { min-width: 92px; }
+.button.danger { border: 1px solid #f0b7b1; background: #fff; color: #a62d22; }
+.button.danger:hover:not(:disabled) { border-color: #c53b2f; background: #fff1ef; }
+.button.danger:disabled { opacity: .38; cursor: not-allowed; }
+.employee-history-note { margin: -4px 0 13px; max-width: 680px; line-height: 1.5; }
 
 .orders-workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
 .order-sidebar { position: sticky; top: 120px; display: grid; gap: 18px; }
@@ -151,4 +157,3 @@ body { background-image: radial-gradient(circle at 85% 0, #fff0e9 0, transparent
   .order-sidebar { grid-template-columns: 1fr; }
   .order-fields, .employee-unified-form, .login-fields { grid-template-columns: 1fr; }
 }
-

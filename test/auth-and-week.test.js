@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { passwordMatches, passwordRecord, publicUser, validateCredentials } from '../src/auth.js';
+import { passwordMatches, passwordNeedsUpgrade, passwordRecord, publicUser, validateCredentials } from '../src/auth.js';
 import { createManualWeek } from '../src/week.js';
 
 test('hashes passwords and never exposes password data', async () => {
@@ -8,14 +8,17 @@ test('hashes passwords and never exposes password data', async () => {
   const user = { id: 'u1', username: 'beispiel', name: 'Beispiel', personnelNumber: '101', active: true, createdAt: '2026-01-01', ...record };
   assert.equal(await passwordMatches('sicheres-passwort', user), true);
   assert.equal(await passwordMatches('falsch', user), false);
+  assert.equal(record.passwordN, 2 ** 17);
+  assert.equal(passwordNeedsUpgrade(user), false);
   assert.equal('passwordHash' in publicUser(user), false);
   assert.equal(publicUser(user).role, 'Vollzugriff');
 });
 
 test('normalizes and validates account fields', () => {
-  const result = validateCredentials({ username: '  Test.User ', name: 'Beispiel', personnelNumber: ' 101 ', password: '12345678' });
+  const result = validateCredentials({ username: '  Test.User ', name: 'Beispiel', personnelNumber: ' 101 ', password: '123456789012345' });
   assert.equal(result.username, 'test.user');
   assert.equal(result.personnelNumber, '101');
+  assert.throws(() => validateCredentials({ username: 'test.user', name: 'Beispiel', personnelNumber: '101', password: '12345678' }), /15 Zeichen/);
 });
 
 test('creates a manual week from active employees without accounts', () => {
@@ -30,4 +33,3 @@ test('creates a manual week from active employees without accounts', () => {
   assert.equal(week.employees[0].days.length, 5);
   assert.equal(week.source, 'manual');
 });
-
