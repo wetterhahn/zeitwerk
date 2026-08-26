@@ -64,8 +64,14 @@ function orderMetadata(sheet, index) {
   const number = contractRow ? textValue(sheet.getCell(contractRow + 1, 2)) : '';
   const requester = contractRow ? textValue(sheet.getCell(contractRow + 1, 5)) : '';
   const remarkRow = findLabelRow(sheet, /Bemerkung/i);
-  const name = (remarkRow ? textValue(sheet.getCell(remarkRow, 3)) : '') || textValue(sheet.getCell(43, 3)) || sheet.name.trim();
-  return { id: `auftrag-${index + 1}`, number, name, requester, active: true, sourceSheet: sheet.name };
+  const firstRemarkRow = remarkRow || 43;
+  const remarks = [];
+  for (let row = firstRemarkRow; row <= Math.min(sheet.rowCount, firstRemarkRow + 7); row += 1) {
+    const line = textValue(sheet.getCell(row, 3));
+    if (line && !remarks.includes(line)) remarks.push(line);
+  }
+  const name = remarks.shift() || sheet.name.trim();
+  return { id: `auftrag-${index + 1}`, number, name, description: remarks.join('\n'), requester, active: true, sourceSheet: sheet.name };
 }
 
 function readAttendanceEmployees(sheet) {
@@ -147,3 +153,4 @@ export async function importWorkbook(buffer, fileName = 'import.xlsx') {
     orders,
   };
 }
+
