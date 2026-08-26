@@ -1,6 +1,6 @@
 # Zeitwerk
 
-Aktuelle Version: **v1.2.0**
+Aktuelle Version: **v1.3.0**
 
 Selbst gehostete Wochenzeiterfassung mit gemeinsamer Mitarbeiterverwaltung, optionalen Anmeldekonten und optionalem Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
 
@@ -59,7 +59,11 @@ In Portainer den Stack öffnen, **Pull latest image** beziehungsweise **Re-pull 
 
 ## Mitarbeiter, Benutzer und Sicherheit
 
-Mitarbeiter sind reine Stammdaten für die Zeiterfassung und benötigen standardmäßig kein Konto. Anmeldung, Benutzername und Passwort werden optional direkt am Mitarbeiter aktiviert. Passwörter werden mit `scrypt` und einem individuellen Salt gehasht gespeichert; alle aktiven Konten haben bewusst dieselbe Berechtigungsstufe **Vollzugriff**. Sitzungen laufen nach zwölf Stunden ab und werden beim Neustart des Containers beendet. Für den Einsatz außerhalb des internen Netzes wird zusätzlich HTTPS über einen Reverse Proxy empfohlen. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
+Mitarbeiter sind reine Stammdaten für die Zeiterfassung und benötigen standardmäßig kein Konto. Anmeldung, Benutzername und Passwort werden optional direkt am Mitarbeiter aktiviert; alle aktiven Konten haben bewusst dieselbe Berechtigungsstufe **Vollzugriff**. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
+
+Mitarbeiter können wieder gelöscht werden. Dabei werden Stammdaten und ein zugehöriges Anmeldekonto entfernt; bereits erfasste Wochen bleiben bewusst als Historie erhalten. Der eigene angemeldete Mitarbeiter ist gegen versehentliches Löschen geschützt.
+
+Neue Passwörter benötigen mindestens 15 Zeichen und werden mit gehärteten `scrypt`-Parametern sowie individuellem Salt gespeichert. Ältere Hashes werden beim nächsten erfolgreichen Login automatisch aktualisiert. Fehlversuche werden gedrosselt, Sitzungen nach 30 Minuten Inaktivität oder spätestens acht Stunden beendet und bei Passwortänderung beziehungsweise Kontolöschung serverseitig widerrufen. Cookies verwenden `HttpOnly`, `SameSite=Strict` und unter HTTPS zusätzlich `Secure`. Für jeden Zugriff außerhalb eines vollständig vertrauenswürdigen internen Netzes ist HTTPS über einen Reverse Proxy erforderlich.
 
 ## Lokale Entwicklung
 
