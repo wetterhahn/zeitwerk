@@ -28,6 +28,7 @@ test('imports attendance, order metadata and daily allocation', async () => {
   detail.getCell('E41').value = 'Beispiel-Anforderer';
   detail.getCell('B43').value = 'Bemerkung:';
   detail.getCell('C43').value = 'Beispielauftrag';
+  detail.getCell('C45').value = 'Ausführliche Beschreibung der Arbeiten';
 
   const buffer = await workbook.xlsx.writeBuffer();
   const result = await importWorkbook(buffer, 'beispiel.xlsx');
@@ -40,4 +41,6 @@ test('imports attendance, order metadata and daily allocation', async () => {
   assert.equal(result.employees[0].days[0].allocations[0].hours, 8.5);
   assert.equal(result.orders[0].number, '10001');
   assert.equal(result.orders[0].name, 'Beispielauftrag');
+  assert.equal(result.orders[0].description, 'Ausführliche Beschreibung der Arbeiten');
 });
+
