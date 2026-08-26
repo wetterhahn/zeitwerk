@@ -1,6 +1,6 @@
 # Zeitwerk
 
-Aktuelle Version: **v1.3.1**
+Aktuelle Version: **v1.4.0**
 
 Selbst gehostete Wochenzeiterfassung mit gemeinsamer Mitarbeiterverwaltung, optionalen Anmeldekonten und optionalem Import der bestehenden Excel-Wochenmappe. Die Anwendung besteht aus einem einzelnen Docker-Container und speichert ihre Daten zentral in einem Docker-Volume.
 
@@ -60,6 +60,10 @@ In Portainer den Stack öffnen, **Pull latest image** beziehungsweise **Re-pull 
 ## Mitarbeiter, Benutzer und Sicherheit
 
 Mitarbeiter sind reine Stammdaten für die Zeiterfassung und benötigen standardmäßig kein Konto. Anmeldung, Benutzername und Passwort werden optional direkt am Mitarbeiter aktiviert; alle aktiven Konten haben bewusst dieselbe Berechtigungsstufe **Vollzugriff**. Der Container läuft als unprivilegierter Benutzer und besitzt einen Healthcheck.
+
+Jedes angemeldete Konto kann in der Erfassung zwischen allen sichtbaren Mitarbeitern wechseln und deren Zeiten pflegen. Neu angelegte aktive Mitarbeiter werden auch in bereits vorhandene Kalenderwochen aufgenommen. Über **Aus Erfassung und Übersichten ausblenden** können insbesondere reine Anmeldekonten aus Zeiterfassung, Wochenübersicht und Auftragszuordnung entfernt werden, ohne ihren Vollzugriff zu verlieren.
+
+In jedem Auftrag werden Mitarbeiter einzeln hinzugefügt oder entfernt. Erst danach erscheinen ihre Tagesfelder für die Stundenverteilung. Vorhandene Excel-Zuordnungen werden automatisch als Auftragsmitarbeiter übernommen.
 
 Mitarbeiter können wieder gelöscht werden. Dabei werden Stammdaten und ein zugehöriges Anmeldekonto entfernt; bereits erfasste Wochen bleiben bewusst als Historie erhalten. Der eigene angemeldete Mitarbeiter ist gegen versehentliches Löschen geschützt.
 

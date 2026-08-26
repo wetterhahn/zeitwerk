@@ -28,7 +28,7 @@ export function createManualWeek({ year, weekNumber, employees }) {
     importedAt: null,
     createdAt: now,
     updatedAt: now,
-    employees: employees.filter((employee) => employee.active).map((employee) => ({
+    employees: employees.filter((employee) => employee.active && !employee.hiddenFromTracking).map((employee) => ({
       id: employee.personnelNumber,
       name: employee.name,
       days: Array.from({ length: 5 }, () => ({ start: '', end: '', pause: 0, allocations: [] }))
@@ -36,4 +36,3 @@ export function createManualWeek({ year, weekNumber, employees }) {
     orders: []
   };
 }
-

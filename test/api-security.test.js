@@ -35,12 +35,33 @@ test('protects mutations and safely deletes employees while retaining week histo
   const crossSite = await request('/api/employees', { method: 'POST', cookie: sessionCookie, origin: 'https://example.invalid', body: { name: 'Nicht erlaubt', personnelNumber: '98' } });
   assert.equal(crossSite.status, 403);
 
-  const created = await request('/api/employees', { method: 'POST', cookie: sessionCookie, body: { name: 'Montage Beispiel', personnelNumber: '7', loginEnabled: false } });
+  const officeAccount = await request('/api/employees', { method: 'POST', cookie: sessionCookie, body: { name: 'Büro Vollzugriff', personnelNumber: '9', loginEnabled: true, username: 'buero', password: '12345678', hiddenFromTracking: true } });
+  assert.equal(officeAccount.status, 201);
+  assert.equal((await officeAccount.json()).employee.hiddenFromTracking, true);
+  const officeLogin = await request('/api/login', { method: 'POST', body: { username: 'buero', password: '12345678' } });
+  assert.equal(officeLogin.status, 200);
+  const officeCookie = officeLogin.headers.getSetCookie().map((value) => value.split(';')[0]).find((value) => /^zeitwerk_session=[0-9a-f]+$/.test(value));
+  assert.ok(officeCookie);
+
+  const created = await request('/api/employees', { method: 'POST', cookie: officeCookie, body: { name: 'Montage Beispiel', personnelNumber: '7', loginEnabled: false } });
   assert.equal(created.status, 201);
   const employee = (await created.json()).employee;
 
-  const week = await request('/api/weeks', { method: 'POST', cookie: sessionCookie, body: { year: 2026, weekNumber: 26 } });
+  const week = await request('/api/weeks', { method: 'POST', cookie: officeCookie, body: { year: 2026, weekNumber: 26 } });
   assert.equal(week.status, 201);
+  assert.equal((await week.json()).week.employees.some((item) => item.id === '9'), false);
+
+  const laterEmployee = await request('/api/employees', { method: 'POST', cookie: officeCookie, body: { name: 'Später angelegt', personnelNumber: '8', loginEnabled: false } });
+  assert.equal(laterEmployee.status, 201);
+  const synchronizedWeek = await request('/api/weeks/2026-kw-26', { cookie: officeCookie }).then((response) => response.json());
+  assert.equal(synchronizedWeek.week.employees.some((item) => item.id === '8'), true);
+
+  const orderEmployees = synchronizedWeek.week.employees.map((item) => ({ ...item, days: item.days.map((day, dayIndex) => ({ ...day, allocations: item.id === '7' && dayIndex === 0 ? [{ orderId: 'auftrag-1', hours: 8 }] : [] })) }));
+  const orderUpdate = await request('/api/weeks/2026-kw-26/orders', { method: 'PUT', cookie: officeCookie, body: { orders: [{ id: 'auftrag-1', number: '10001', name: 'Testauftrag', employeeIds: ['7'], active: true }], employees: orderEmployees } });
+  assert.equal(orderUpdate.status, 200);
+  const orderWeek = await request('/api/weeks/2026-kw-26', { cookie: officeCookie }).then((response) => response.json());
+  assert.deepEqual(orderWeek.week.orders[0].employeeIds, ['7']);
+  assert.equal(orderWeek.week.employees.find((item) => item.id === '7').days[0].allocations[0].hours, 8);
 
   const ownDelete = await request(`/api/employees/${(await request('/api/employees', { cookie: sessionCookie }).then((response) => response.json())).employees.find((item) => item.account?.username === 'admin').id}`, { method: 'DELETE', cookie: sessionCookie, body: {} });
   assert.equal(ownDelete.status, 400);

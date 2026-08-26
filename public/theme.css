@@ -67,6 +67,9 @@ body { background-image: radial-gradient(circle at 85% 0, #fff0e9 0, transparent
 .user-card { padding: 18px; }
 .user-card.inactive { opacity: .62; }
 .user-head { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+.user-card.tracking-hidden { border-style: dashed; background: #fafafa; }
+.hidden-tag { margin-left: auto; background: #f0edeb; color: #686466; }
+.visibility-toggle { grid-column: 1 / -1; padding: 10px 12px; border-radius: 7px; background: #faf6f3; }
 .user-head h3 { margin: 0; font-size: 14px; }
 .user-head p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
 .user-head .role-tag { margin-left: auto; }
@@ -117,8 +120,14 @@ body { background-image: radial-gradient(circle at 85% 0, #fff0e9 0, transparent
 .hours-matrix { overflow-x: auto; padding: 0; }
 .matrix-title { display: flex; align-items: center; justify-content: space-between; min-width: 680px; padding: 18px; }
 .matrix-title h3 { margin: 0; }
+.matrix-title p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
 .matrix-title > strong { color: var(--green); font-size: 18px; }
-.order-hours-row { min-width: 680px; display: grid; grid-template-columns: minmax(170px, 1.5fr) repeat(5, 65px) 75px; gap: 8px; align-items: center; padding: 11px 16px; border-top: 1px solid #f0ece9; }
+.matrix-actions { min-width: 740px; padding: 0 16px 16px; }
+.order-employee-picker { display: flex; gap: 8px; align-items: center; }
+.order-employee-picker select { min-width: 240px; height: 41px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 10px; }
+.all-assigned-note { color: var(--muted); font-size: 10px; }
+.matrix-empty { min-width: 740px; padding: 24px 16px; border-top: 1px solid #f0ece9; color: var(--muted); font-size: 11px; text-align: center; }
+.order-hours-row { min-width: 740px; display: grid; grid-template-columns: minmax(170px, 1.5fr) repeat(5, 65px) 75px 30px; gap: 8px; align-items: center; padding: 11px 16px; border-top: 1px solid #f0ece9; }
 .order-hours-row.matrix-head { background: #faf6f3; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; }
 .order-employee { display: flex; align-items: center; gap: 9px; }
 .order-employee b, .order-employee small { display: block; }

@@ -43,6 +43,23 @@ const credentialsFrom = (body, requirePassword = true) => {
 const duplicateUser = (users, credentials, excludedId) => users.find((user) => user.id !== excludedId && user.username === credentials.username);
 const employeeFrom = (store, employeeId) => store.employees.find((employee) => employee.id === employeeId);
 const employeeWithAccount = (store, employee) => ({ ...employee, account: store.users.find((user) => user.employeeId === employee.id) ? publicUser(store.users.find((user) => user.employeeId === employee.id)) : null });
+const blankWeekDays = () => Array.from({ length: 5 }, () => ({ start: '', end: '', pause: 0, allocations: [] }));
+
+function syncVisibleEmployeesIntoWeek(store, week) {
+  let changed = false;
+  for (const employee of store.employees.filter((item) => item.active && !item.hiddenFromTracking)) {
+    const existing = week.employees.find((item) => String(item.id) === String(employee.personnelNumber));
+    if (!existing) {
+      week.employees.push({ id: String(employee.personnelNumber), name: employee.name, days: blankWeekDays() });
+      changed = true;
+    } else if (existing.name !== employee.name) {
+      existing.name = employee.name;
+      changed = true;
+    }
+  }
+  if (changed) week.updatedAt = new Date().toISOString();
+  return changed;
+}
 const attemptKey = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const loginKeys = (request, username) => { const address = request.socket.remoteAddress || 'unknown'; return [{ key: attemptKey(`ip:${address}`), maximum: 20 }, { key: attemptKey(`pair:${address}:${username}`), maximum: 5 }]; };
 const retryAfter = (request, username) => loginKeys(request, username).reduce((seconds, item) => {
@@ -89,7 +106,7 @@ app.post('/api/setup', async (request, response, next) => {
     if (store.users.length) return response.status(409).json({ error: 'Die Ersteinrichtung wurde bereits abgeschlossen.' });
     const credentials = credentialsFrom(request.body);
     const password = await passwordRecord(credentials.password);
-    const employee = { id: crypto.randomUUID(), name: credentials.name, personnelNumber: credentials.personnelNumber, active: true, createdAt: new Date().toISOString() };
+    const employee = { id: crypto.randomUUID(), name: credentials.name, personnelNumber: credentials.personnelNumber, active: true, hiddenFromTracking: false, createdAt: new Date().toISOString() };
     const user = { id: crypto.randomUUID(), employeeId: employee.id, username: credentials.username, name: employee.name, personnelNumber: employee.personnelNumber, active: true, createdAt: new Date().toISOString(), ...password };
     store.employees.push(employee);
     store.users.push(user);
@@ -154,7 +171,7 @@ app.post('/api/employees', async (request, response, next) => {
     const store = await readStore();
     const details = validateEmployee(request.body);
     if (store.employees.some((employee) => String(employee.personnelNumber) === details.personnelNumber)) return response.status(409).json({ error: 'Diese Personalnummer ist bereits vergeben.' });
-    const employee = { id: crypto.randomUUID(), ...details, active: true, createdAt: new Date().toISOString() };
+    const employee = { id: crypto.randomUUID(), ...details, active: true, hiddenFromTracking: request.body.hiddenFromTracking === true, createdAt: new Date().toISOString() };
     if (request.body.loginEnabled === true) {
       const credentials = credentialsFrom({ ...request.body, ...details });
       if (duplicateUser(store.users, credentials)) return response.status(409).json({ error: 'Dieser Benutzername ist bereits vergeben.' });
@@ -194,7 +211,7 @@ app.put('/api/employees/:employeeId', async (request, response, next) => {
       clearUserSessions(user.id);
       store.users.splice(userIndex, 1);
     }
-    Object.assign(employee, details, { active });
+    Object.assign(employee, details, { active, hiddenFromTracking: request.body.hiddenFromTracking === true });
     await writeStore(store);
     if (refreshCurrentSession) createSession(request, response, request.currentUser.id, secureRequest(request));
     response.json({ employee: employeeWithAccount(store, employee) });
@@ -281,6 +298,7 @@ app.get('/api/weeks/:weekId', async (request, response, next) => {
     const store = await readStore();
     const week = store.weeks[request.params.weekId];
     if (!week) return response.status(404).json({ error: 'Kalenderwoche nicht gefunden.' });
+    if (syncVisibleEmployeesIntoWeek(store, week)) await writeStore(store);
     response.json({ week });
   } catch (error) { next(error); }
 });
@@ -297,7 +315,7 @@ app.post('/api/import', upload.single('file'), async (request, response, next) =
       const personnelNumber = String(imported.id);
       const existing = store.employees.find((employee) => String(employee.personnelNumber) === personnelNumber);
       if (existing) existing.name = imported.name;
-      else store.employees.push({ id: crypto.randomUUID(), name: imported.name, personnelNumber, active: true, createdAt: new Date().toISOString() });
+      else store.employees.push({ id: crypto.randomUUID(), name: imported.name, personnelNumber, active: true, hiddenFromTracking: false, createdAt: new Date().toISOString() });
     }
     await writeStore(store);
     response.status(201).json({ week: store.weeks[week.id], message: `KW ${week.weekNumber} wurde erfolgreich importiert.` });
@@ -313,6 +331,11 @@ app.put('/api/weeks/:weekId/employees/:employeeId', async (request, response, ne
     if (index < 0) return response.status(404).json({ error: 'Mitarbeiter nicht gefunden.' });
     if (!Array.isArray(request.body.days) || request.body.days.length !== 5) return response.status(400).json({ error: 'Es werden fünf Arbeitstage erwartet.' });
     week.employees[index].days = request.body.days;
+    for (const order of week.orders) {
+      order.employeeIds = Array.isArray(order.employeeIds) ? order.employeeIds.map(String) : [];
+      const assigned = week.employees[index].days.some((day) => day.allocations?.some((allocation) => allocation.orderId === order.id));
+      if (assigned && !order.employeeIds.includes(String(week.employees[index].id))) order.employeeIds.push(String(week.employees[index].id));
+    }
     week.updatedAt = new Date().toISOString();
     await writeStore(store);
     response.json({ employee: week.employees[index] });
@@ -325,7 +348,14 @@ app.put('/api/weeks/:weekId/orders', async (request, response, next) => {
     const week = store.weeks[request.params.weekId];
     if (!week) return response.status(404).json({ error: 'Kalenderwoche nicht gefunden.' });
     if (!Array.isArray(request.body.orders) || request.body.orders.some((order) => !String(order.number || '').trim() || !String(order.name || '').trim())) return response.status(400).json({ error: 'Jeder Auftrag benötigt Auftragsnummer und Bezeichnung.' });
-    week.orders = request.body.orders.map((order) => ({ ...order, number: String(order.number).trim(), name: String(order.name).trim(), description: String(order.description || '').trim(), requester: String(order.requester || '').trim(), active: order.active !== false }));
+    const validEmployeeIds = new Set(week.employees.map((employee) => String(employee.id)));
+    const previousOrders = new Map(week.orders.map((order) => [order.id, order]));
+    const incomingEmployees = Array.isArray(request.body.employees) ? request.body.employees : [];
+    week.orders = request.body.orders.map((order) => {
+      const inferredEmployeeIds = incomingEmployees.filter((employee) => employee.days?.some((day) => day.allocations?.some((allocation) => allocation.orderId === order.id))).map((employee) => String(employee.id));
+      const suppliedEmployeeIds = Array.isArray(order.employeeIds) ? order.employeeIds : (inferredEmployeeIds.length ? inferredEmployeeIds : previousOrders.get(order.id)?.employeeIds || []);
+      return { ...order, number: String(order.number).trim(), name: String(order.name).trim(), description: String(order.description || '').trim(), requester: String(order.requester || '').trim(), active: order.active !== false, employeeIds: [...new Set(suppliedEmployeeIds.map(String).filter((id) => validEmployeeIds.has(id)))] };
+    });
     if (Array.isArray(request.body.employees)) {
       const validOrderIds = new Set(week.orders.map((order) => order.id));
       for (const incoming of request.body.employees) {
@@ -333,7 +363,10 @@ app.put('/api/weeks/:weekId/orders', async (request, response, next) => {
         if (!employee || !Array.isArray(incoming.days) || incoming.days.length !== 5) continue;
         incoming.days.forEach((day, dayIndex) => {
           if (!Array.isArray(day.allocations)) return;
-          employee.days[dayIndex].allocations = day.allocations.filter((allocation) => validOrderIds.has(allocation.orderId) && Number(allocation.hours) >= 0).map((allocation) => ({ orderId: allocation.orderId, hours: Number(allocation.hours) }));
+          employee.days[dayIndex].allocations = day.allocations.filter((allocation) => {
+            const order = week.orders.find((item) => item.id === allocation.orderId);
+            return validOrderIds.has(allocation.orderId) && order?.employeeIds.includes(String(employee.id)) && Number(allocation.hours) >= 0;
+          }).map((allocation) => ({ orderId: allocation.orderId, hours: Number(allocation.hours) }));
         });
       }
     }
